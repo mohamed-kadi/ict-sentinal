@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# ICT Trading Desk (Next.js)
 
-## Getting Started
+Desktop-first single-page ICT trading view with live/public data only. It overlays bias, liquidity, fair value gaps, order blocks, and simple rule-based signals on top of lightweight-charts, with a backtest/replay switch.
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Quick start
+1) Install deps: `npm install`
+2) Run dev server: `npm run dev` then open `http://localhost:3000`
+3) (Optional) Env vars for forex/gold in `.env.local`:
 ```
+TWELVE_DATA_KEY=your_key   # preferred
+# or
+ALPHA_VANTAGE_KEY=your_key
+```
+4) (Optional) Drop reproducible candle data into `public/backtest-sample.json` (same structure as the sample file) when you need to share exact backtests.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Documentation
+- Technical guide: `docs/TECHNICAL.md`
+- Architecture overview: `docs/ARCHITECTURE.md`
+- User manual: `docs/USER_MANUAL.md`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Stack
+- Next.js 13 (app router, TypeScript, Tailwind)
+- React Query for data fetch/cache, Zustand for UI/backtest state
+- Lightweight Charts for OHLC + markers
+- API routes:
+  - `/api/crypto/klines` → Binance public OHLC (no key)
+  - `/api/forex/klines` → TwelveData (free key) or Alpha Vantage fallback
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+## Features in this cut
+- Symbol/timeframe selector (BTC/ETH/SOL/XRP + EURUSD/GBPUSD/USDJPY/XAUUSD; 1m→1D).
+- ICT overlays: swings/liquidity, FVG detection, heuristic order blocks, session windows, daily bias, rule-based buy/sell markers. The overlay drawer now includes toggles for inversion-FVG signals and trade markers so you can declutter the main chart when needed.
+- Backtest mode: scrubs through loaded history with play/pause/step and speed control. Auto-trade controls let you replay any percentage slice of history (0–100 by default) and optional partial scaling logic feeds the paper-trade ledger automatically.
+- Blueprint magnet: movable, resizable mini-window that shows the active candle blueprint (date, time, OHLC range) and serves as the docking point for upcoming order-book/footprint data without covering the main chart.
+- Insight panel showing counts and latest setups, plus live paper-trade stats with manual trade validation and chart markers (BUY/SELL) for both manual and auto trades.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+## Next steps to harden
+- Draw true shaded zones for FVG/OB + session backgrounds.
+- Add paging/stitching for deeper history, plus caching.
+- Hook manual trade marking and R-multiple stats in backtest state.
+- Strengthen ICT heuristics (multi-timeframe bias, BOS/CHoCH checks) and parameter controls.
