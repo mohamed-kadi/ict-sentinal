@@ -5,7 +5,7 @@ Desktop-first single-page ICT trading view with live/public data only. It overla
 ## Quick start
 1) Install deps: `npm install`
 2) Run dev server: `npm run dev` then open `http://localhost:3000`
-3) (Optional) Env vars for forex/gold in `.env.local`:
+3) (Optional) create a `.env.local` (never committed) if you want forex/gold data:
 ```
 TWELVE_DATA_KEY=your_key   # preferred
 # or
