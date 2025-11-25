@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { AssetClass, Bias, Gap, OrderBlock, Signal, Swing, PremiumDiscountRange } from '@/lib/types';
 import { TradePanel } from './TradePanel';
 import { SYMBOL_LOGOS } from './TopBar';
@@ -64,10 +65,13 @@ export function InsightPanel({
         <div className="px-3 pb-3 pt-1">
           <div className="flex items-center gap-2">
             {symbol && (
-              <img
+              <Image
                 src={SYMBOL_LOGOS[symbol] ?? SYMBOL_LOGOS.default}
                 alt={symbol}
+                width={32}
+                height={32}
                 className="h-8 w-8 rounded-full bg-zinc-800 object-contain"
+                sizes="32px"
               />
             )}
             <div>

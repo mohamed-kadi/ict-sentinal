@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import clsx from "clsx";
 import type {
@@ -43,6 +43,13 @@ const TIER_ONE_SETUPS = new Set([
   "Silver Bullet",
   "Turtle Soup",
 ]);
+const TIME_LABEL_FORMAT: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+};
 
 type Props = {
   symbol?: string;
@@ -132,6 +139,7 @@ export function ChartPanel({
     clockTz,
     setClockTz: updateClockTz,
     notificationsEnabled,
+    optimizerEnabled,
     addTrade,
     trades,
     updateTrade,
@@ -146,12 +154,17 @@ export function ChartPanel({
       clockTz: state.clockTz,
       setClockTz: state.setClockTz,
       notificationsEnabled: state.notificationsEnabled,
+      optimizerEnabled: state.optimizerEnabled,
       addTrade: state.addTrade,
       trades: state.backtest.trades,
       updateTrade: state.updateTrade,
       setBacktest: state.setBacktest,
     })),
   );
+  const candlesSnapshotRef = useRef(candles);
+  candlesSnapshotRef.current = candles;
+  const clockTzRef = useRef(clockTz);
+  clockTzRef.current = clockTz;
   const [hoverTzTime, setHoverTzTime] = useState<string | null>(null);
   const [lastTzTime, setLastTzTime] = useState<string | null>(null);
   const [liveClock, setLiveClock] = useState<string>(() => formatWithTz(new Date(), clockTz));
@@ -178,8 +191,21 @@ export function ChartPanel({
   const [signalPrompt, setSignalPrompt] = useState<Signal | null>(null);
   const [signalPromptScore, setSignalPromptScore] = useState<number | null>(null);
   const lastPromptedSignalRef = useRef<number | null>(null);
-  const promptSignals = notificationSignals ?? signals;
+  const promptSignalSource = backtest?.enabled
+    ? notificationSignals ?? signals
+    : backtestSignals ?? notificationSignals ?? signals;
+  const promptSignals = useMemo(() => promptSignalSource ?? [], [promptSignalSource]);
+  const [manualTradePrompt, setManualTradePrompt] = useState<{
+    x: number;
+    y: number;
+    price: number;
+    time: number;
+  } | null>(null);
+  const manualMenuRef = useRef<HTMLDivElement | null>(null);
   const backtestSignalSource = backtestSignals ?? notificationSignals ?? signals;
+  const lastSignalFeed = backtestSignals ?? notificationSignals ?? signals;
+  const lastSignal =
+    lastSignalFeed && lastSignalFeed.length ? lastSignalFeed.at(-1)! : null;
   const backtestCandles = fullCandles && fullCandles.length ? fullCandles : candles;
   const datasetKey = `${symbol ?? "?"}-${timeframe ?? "?"}`;
   const lastDatasetKeyRef = useRef(datasetKey);
@@ -223,7 +249,7 @@ export function ChartPanel({
     window.addEventListener('pointerup', stopMagnetDrag);
   };
 
-  const handleMagnetDrag = (evt: PointerEvent) => {
+  const handleMagnetDrag = useCallback((evt: PointerEvent) => {
     if (!dragState.current) return;
     const dx = evt.clientX - dragState.current.startX;
     const dy = evt.clientY - dragState.current.startY;
@@ -233,88 +259,106 @@ export function ChartPanel({
       x: Math.min(Math.max(dragState.current.origX + dx, 8), boundX),
       y: Math.min(Math.max(dragState.current.origY + dy, 8), boundY),
     });
-  };
+  }, []);
 
-  const stopMagnetDrag = () => {
+  const stopMagnetDrag = useCallback(() => {
     dragState.current = null;
     window.removeEventListener('pointermove', handleMagnetDrag);
     window.removeEventListener('pointerup', stopMagnetDrag);
-  };
+  }, [handleMagnetDrag]);
 
   useEffect(() => {
     return () => {
       window.removeEventListener('pointermove', handleMagnetDrag);
       window.removeEventListener('pointerup', stopMagnetDrag);
     };
-  }, []);
-  const matchesSelectedSetup = (setup?: string) => {
-    if (!setup) return false;
-    if (selectedSetup === "all") return true;
-    if (selectedSetup === "advanced") return ADVANCED_SETUPS.has(setup);
-    return setup === selectedSetup;
-  };
+  }, [handleMagnetDrag, stopMagnetDrag]);
+  const matchesSelectedSetup = useCallback(
+    (setup?: string) => {
+      if (!setup) return false;
+      if (selectedSetup === "all") return true;
+      if (selectedSetup === "advanced") return ADVANCED_SETUPS.has(setup);
+      return setup === selectedSetup;
+    },
+    [selectedSetup],
+  );
   const totalCandles = backtestTotal ?? candles.length;
   const backtestCurrent = backtest?.enabled ? Math.min(backtest.cursor + 1, Math.max(totalCandles, 1)) : null;
   const backtestProgress =
     backtest?.enabled && totalCandles > 0 ? Math.min(1, Math.max(0, (backtestCurrent ?? 0) / totalCandles)) : null;
-  const buildSignalId = (signal: Signal) => `${signal.direction}-${signal.time}-${signal.setup ?? "ict"}`;
-  const enterDemoTradeFromSignal = (
-    signal: Signal,
-    overrides: Partial<BacktestTrade> = {},
-    force = false,
-  ): BacktestTrade | null => {
-    if (!addTrade) return null;
-    const signalId = overrides.signalId ?? buildSignalId(signal);
-    if (!force && seenSignalIdsRef.current.has(signalId)) return null;
-    const stop =
-      overrides.stop ??
-      signal.stop ??
-      (signal.direction === "buy" ? signal.price * (1 - 0.001) : signal.price * (1 + 0.001));
-    const baseRisk = Math.max(Math.abs(signal.price - stop), Math.abs(signal.price) * 0.0005);
-    const risk = overrides.risk ?? baseRisk;
-    const isTierOneSetup = TIER_ONE_SETUPS.has(signal.setup ?? "");
-    const partialFraction = !isTierOneSetup ? 0.5 : undefined;
-    const takePartial =
-      overrides.takePartial ??
-      (!isTierOneSetup
-        ? signal.direction === "buy"
-          ? signal.price + risk * 2
-          : signal.price - risk * 2
-        : undefined);
-    const positionSize = overrides.positionSize ?? signal.sizeMultiplier ?? 1;
-    const target =
-      overrides.target ??
-      signal.tp1 ??
-      signal.tp2 ??
-      signal.tp3 ??
-      signal.tp4 ??
-      (signal.direction === "buy" ? signal.price + risk : signal.price - risk);
-    const rMultiple =
-      overrides.rMultiple ??
-      (risk > 0 ? Math.abs(target - signal.price) / risk : undefined);
-    const trade: BacktestTrade = {
-      id: overrides.id ?? `bt-${signal.setup ?? "ict"}-${signal.time}-${Math.random().toString(36).slice(2, 6)}`,
-      direction: overrides.direction ?? signal.direction,
-      entry: overrides.entry ?? signal.price,
-      stop,
-      target,
-      rMultiple,
-      setup: signal.setup,
-      signalId,
-      initialStop: overrides.initialStop ?? stop,
-      risk,
-      takePartial,
-      partialFraction,
-      partialHit: overrides.partialHit ?? false,
-      partialRealized: overrides.partialRealized,
-      openTime: overrides.openTime ?? signal.time,
-      positionSize,
-      ...overrides,
-    };
-    addTrade(trade);
-    seenSignalIdsRef.current.add(signalId);
-    return trade;
-  };
+  const buildSignalId = useCallback(
+    (signal: Signal) => `${signal.direction}-${signal.time}-${signal.setup ?? "ict"}`,
+    [],
+  );
+  const enterDemoTradeFromSignal = useCallback(
+    (
+      signal: Signal,
+      overrides: Partial<BacktestTrade> = {},
+      force = false,
+    ): BacktestTrade | null => {
+      if (!addTrade) return null;
+      const signalId = overrides.signalId ?? buildSignalId(signal);
+      if (!force && seenSignalIdsRef.current.has(signalId)) return null;
+      let stop =
+        overrides.stop ??
+        signal.stop ??
+        (signal.direction === "buy" ? signal.price * (1 - 0.001) : signal.price * (1 + 0.001));
+      let directionalRisk = signal.direction === "buy" ? signal.price - stop : stop - signal.price;
+      if (directionalRisk <= 0) {
+        const fallback = Math.abs(signal.price) * 0.0008;
+        stop = signal.direction === "buy" ? signal.price - fallback : signal.price + fallback;
+        directionalRisk = fallback;
+      }
+      const baseRisk = Math.max(directionalRisk, Math.abs(signal.price) * 0.0005);
+      const risk = overrides.risk ?? baseRisk;
+      const isTierOneSetup = TIER_ONE_SETUPS.has(signal.setup ?? "");
+      const partialFraction = !isTierOneSetup ? 0.5 : undefined;
+      const takePartial =
+        overrides.takePartial ??
+        (!isTierOneSetup
+          ? signal.direction === "buy"
+            ? signal.price + risk * 2
+            : signal.price - risk * 2
+          : undefined);
+      const positionSize = overrides.positionSize ?? signal.sizeMultiplier ?? 1;
+      const target =
+        overrides.target ??
+        signal.tp1 ??
+        signal.tp2 ??
+        signal.tp3 ??
+        signal.tp4 ??
+        (signal.direction === "buy" ? signal.price + risk : signal.price - risk);
+      const rMultiple =
+        overrides.rMultiple ??
+        (risk > 0 ? Math.abs(target - signal.price) / risk : undefined);
+      const trade: BacktestTrade = {
+        id: overrides.id ?? `bt-${signal.setup ?? "ict"}-${signal.time}-${Math.random().toString(36).slice(2, 6)}`,
+        direction: overrides.direction ?? signal.direction,
+        entry: overrides.entry ?? signal.price,
+        stop,
+        target,
+        rMultiple,
+        setup: signal.setup,
+        signalId,
+        initialStop: overrides.initialStop ?? stop,
+        risk,
+        takePartial,
+        partialFraction,
+        partialHit: overrides.partialHit ?? false,
+        partialRealized: overrides.partialRealized,
+        openTime: overrides.openTime ?? signal.time,
+        positionSize,
+        sessionLabel: overrides.sessionLabel ?? signal.session ?? undefined,
+        biasLabel: overrides.biasLabel ?? signal.bias ?? undefined,
+        status: overrides.status ?? "active",
+        ...overrides,
+      };
+      addTrade(trade);
+      seenSignalIdsRef.current.add(signalId);
+      return trade;
+    },
+    [addTrade, buildSignalId],
+  );
   const runAutoBacktest = () => {
     if (!backtest?.enabled || !patchBacktest) {
       setAutoError("Enable backtest before auto trading.");
@@ -406,6 +450,64 @@ export function ChartPanel({
     setAutoSummary({ trades: added, wins, losses });
     setAutoRunning(false);
   };
+
+  const convertCoordTime = useCallback((value: Time | null): number | null => {
+    if (value == null) return null;
+    if (typeof value === "number") return value * 1000;
+    if (typeof value === "object" && "year" in value) {
+      return Date.UTC(value.year, (value.month ?? 1) - 1, value.day ?? 1);
+    }
+    return null;
+  }, []);
+
+  const handleManualTrade = useCallback(
+    (direction: "buy" | "sell") => {
+      if (!manualTradePrompt) return;
+      const session = classifySession(new Date(manualTradePrompt.time), SESSION_ZONES);
+      const manualSignal: Signal = {
+        time: manualTradePrompt.time,
+        price: manualTradePrompt.price,
+        direction,
+        basis: "Manual chart trade",
+        setup: "Manual Chart Trade",
+        session: session?.label ?? null,
+        bias: bias?.label,
+      };
+      enterDemoTradeFromSignal(manualSignal, { manual: true, status: "planned" }, true);
+      setManualTradePrompt(null);
+    },
+    [manualTradePrompt, bias?.label, enterDemoTradeFromSignal],
+  );
+
+  const handleChartContextMenu = useCallback(
+    (evt: React.MouseEvent<HTMLDivElement>) => {
+      if (!containerRef.current || !chartRef.current || !seriesRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const inside =
+        evt.clientX >= rect.left &&
+        evt.clientX <= rect.right &&
+        evt.clientY >= rect.top &&
+        evt.clientY <= rect.bottom;
+      if (!inside) return;
+      evt.preventDefault();
+      const relX = evt.clientX - rect.left;
+      const relY = evt.clientY - rect.top;
+      const price = seriesRef.current.coordinateToPrice(relY);
+      if (price == null || !Number.isFinite(price)) {
+        setManualTradePrompt(null);
+        return;
+      }
+      const timeValue = chartRef.current.timeScale().coordinateToTime(relX);
+      const timeMs = convertCoordTime(timeValue ?? null) ?? candlesSnapshotRef.current.at(-1)?.t ?? Date.now();
+      setManualTradePrompt({
+        x: relX,
+        y: relY,
+        price: Number(price),
+        time: timeMs,
+      });
+    },
+    [convertCoordTime],
+  );
   const [hoverPoint, setHoverPoint] = useState<{ x: number; y: number } | null>(null);
   const [hoverPrice, setHoverPrice] = useState<number | null>(null);
   const [hoverCandle, setHoverCandle] = useState<Candle | null>(null);
@@ -414,7 +516,61 @@ export function ChartPanel({
   const [autoSummary, setAutoSummary] = useState<{ trades: number; wins: number; losses: number } | null>(null);
   const [autoError, setAutoError] = useState<string | null>(null);
   const [autoRunning, setAutoRunning] = useState(false);
+  const [setupStats, setSetupStats] = useState<Record<string, { wins: number; losses: number; winR: number; lossR: number }>>({});
+  const setupStatsEntries = useMemo(
+    () =>
+      Object.entries(setupStats)
+        .map(([setupName, stat]) => {
+          const wins = stat.wins;
+          const losses = stat.losses;
+          const total = wins + losses;
+          const avgWin = wins ? stat.winR / wins : 0;
+          const avgLoss = losses ? stat.lossR / losses : 0;
+          const winRate = total ? (wins / total) * 100 : 0;
+          return { setup: setupName, wins, losses, total, avgWin, avgLoss, winRate };
+        })
+        .sort((a, b) => b.total - a.total || b.winRate - a.winRate || a.setup.localeCompare(b.setup)),
+    [setupStats],
+  );
   const seenSignalIdsRef = useRef<Set<string>>(new Set());
+  const processedTradeIdsRef = useRef<Set<string>>(new Set());
+  const copySetupStats = useCallback(() => {
+    if (!Object.keys(setupStats).length || typeof navigator === "undefined") return;
+    const payload = Object.entries(setupStats)
+      .map(([setup, stat]) => {
+        const avgWin = stat.wins ? (stat.winR / stat.wins).toFixed(2) : "-";
+        const avgLoss = stat.losses ? (stat.lossR / stat.losses).toFixed(2) : "-";
+        return `${setup}: W ${stat.wins} / L ${stat.losses} (avg ${avgWin}/${avgLoss}R)`;
+      })
+      .join("\n");
+    navigator.clipboard?.writeText(payload).catch(() => {});
+  }, [setupStats]);
+  const logTradeOutcome = useCallback((trade: BacktestTrade) => {
+    if (typeof window === "undefined") return;
+    if (!trade.setup) return;
+    if (trade.result !== "win" && trade.result !== "loss") return;
+    const size = trade.positionSize ?? 1;
+    const effectiveRisk = trade.risk && trade.risk > 0 ? trade.risk : undefined;
+    const pnlPerUnit = trade.pnl != null ? trade.pnl / size : undefined;
+    const computedR =
+      trade.rMultiple ??
+      (effectiveRisk && effectiveRisk > 0 && pnlPerUnit != null
+        ? pnlPerUnit / effectiveRisk
+        : trade.result === "win"
+          ? 1
+          : -1);
+    fetch("/api/trade-memory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        setup: trade.setup,
+        session: trade.sessionLabel ?? "Unknown",
+        bias: trade.biasLabel ?? "Neutral",
+        result: trade.result,
+        rMultiple: Number.isFinite(computedR) ? computedR : trade.result === "win" ? 1 : -1,
+      }),
+    }).catch(() => {});
+  }, []);
   useEffect(() => {
     setPendingPoints([]);
     setPreviewPoint(null);
@@ -434,12 +590,66 @@ export function ChartPanel({
   }, [datasetKey]);
 
   useEffect(() => {
+    if (notificationsEnabled && backtest?.enabled) {
+      console.warn(
+        "[ICT] Entry alerts follow the Backtest playback. Disable Backtest to receive live alerts.",
+      );
+    }
+  }, [notificationsEnabled, backtest?.enabled]);
+
+  useEffect(() => {
+    if (!notificationsEnabled) return;
+    const latestTime = candles.at(-1)?.t ?? null;
+    const lastSignalTime = lastSignal?.time ?? null;
+    if (!latestTime || !lastSignalTime) return;
+    const ageHours = (latestTime - lastSignalTime) / (60 * 60 * 1000);
+    if (ageHours >= 8) {
+      console.info(
+        `[ICT] No entry alerts detected in ${ageHours.toFixed(1)}h (last alert ${new Date(lastSignalTime).toISOString()}).`,
+      );
+    }
+  }, [notificationsEnabled, candles, lastSignal?.time]);
+
+  useEffect(() => {
     const next = new Set<string>();
     trades.forEach((trade) => {
       if (trade.signalId) next.add(trade.signalId);
     });
     seenSignalIdsRef.current = next;
   }, [trades]);
+
+  useEffect(() => {
+    trades.forEach((trade) => {
+      if (!trade.result || processedTradeIdsRef.current.has(trade.id)) return;
+      processedTradeIdsRef.current.add(trade.id);
+      logTradeOutcome(trade);
+      if (!trade.setup) return;
+      const key = trade.setup;
+      const isWin = trade.result === 'win';
+      const rMultiple =
+        trade.rMultiple ??
+        (trade.risk && trade.risk > 0 ? (trade.pnl ?? 0) / trade.risk : trade.pnl ?? 0);
+      setSetupStats((prev) => {
+        const stat = prev[key] ?? { wins: 0, losses: 0, winR: 0, lossR: 0 };
+        const next = { ...stat };
+        if (isWin) {
+          next.wins += 1;
+          next.winR += rMultiple;
+        } else {
+          next.losses += 1;
+          next.lossR += rMultiple;
+        }
+        return { ...prev, [key]: next };
+      });
+    });
+  }, [trades, logTradeOutcome]);
+
+  useEffect(() => {
+    if (trades.length === 0) {
+      processedTradeIdsRef.current.clear();
+      setSetupStats({});
+    }
+  }, [trades.length]);
 
   useEffect(() => {
     const latest = candles.at(-1)?.t ?? null;
@@ -457,12 +667,23 @@ export function ChartPanel({
   }, [candles, backtest?.enabled, signalPrompt]);
 
   useEffect(() => {
-    if (!backtest?.enabled || trades.length === 0 || candles.length === 0 || !updateTrade) return;
+    if (trades.length === 0 || candles.length === 0 || !updateTrade) return;
     const latestIdx = candles.length - 1;
     if (latestIdx < 0) return;
     const latest = candles[latestIdx];
     const latestAtr = atrSeries[latestIdx] ?? 0;
     trades.forEach((trade) => {
+      const status = trade.status ?? (trade.result ? "closed" : "active");
+      if (status === "planned") {
+        if (trade.manual && trade.entry != null) {
+          const entryHit = latest.l <= trade.entry && latest.h >= trade.entry;
+          if (entryHit) {
+            updateTrade(trade.id, { status: "active", openTime: latest.t });
+          }
+        }
+        return;
+      }
+      if (status !== "active") return;
       if (trade.result) return;
       if (trade.stop == null || trade.target == null) return;
       if (trade.openTime == null) {
@@ -472,7 +693,7 @@ export function ChartPanel({
       if (latest.t <= trade.openTime) {
         return;
       }
-      const isManual = !trade.signalId;
+      const isManual = trade.manual === true || !trade.signalId;
       if (isManual) {
         const { direction, stop, target, entry } = trade;
         let outcome: "win" | "loss" | null = null;
@@ -493,7 +714,7 @@ export function ChartPanel({
             : outcome === "win"
               ? entry - target
               : entry - stop) * size;
-        updateTrade(trade.id, { result: outcome, pnl, exitTime: latest.t });
+        updateTrade(trade.id, { result: outcome, pnl, exitTime: latest.t, status: "closed" });
         return;
       }
       const initialStop = trade.initialStop ?? trade.stop;
@@ -571,7 +792,7 @@ export function ChartPanel({
       const remainingFraction = trade.partialHit ? 1 - (trade.partialFraction ?? 0.5) : 1;
       const size = trade.positionSize ?? 1;
       const pnl = (trade.partialRealized ?? 0) + move * remainingFraction * size;
-      updateTrade(trade.id, { result: outcome, pnl, exitTime: latest.t });
+      updateTrade(trade.id, { result: outcome, pnl, exitTime: latest.t, status: "closed" });
     });
   }, [backtest?.enabled, trades, candles, atrSeries, updateTrade]);
 
@@ -601,13 +822,6 @@ export function ChartPanel({
     long: "#34d399",
     short: "#f87171",
   };
-  const TIME_LABEL_FORMAT: Intl.DateTimeFormatOptions = {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  };
 
   const TOOL_CONFIG: Record<
     DrawingType,
@@ -623,15 +837,6 @@ export function ChartPanel({
     measure: { points: 2, dragPreview: true },
     long: { points: 3, dragPreview: false },
     short: { points: 3, dragPreview: false },
-  };
-
-  const convertCoordTime = (value: Time | null): number | null => {
-    if (value == null) return null;
-    if (typeof value === "number") return value * 1000;
-    if (typeof value === "object" && "year" in value) {
-      return Date.UTC(value.year, (value.month ?? 1) - 1, value.day ?? 1);
-    }
-    return null;
   };
 
   const timeToXCoord = (ms: number) => {
@@ -654,6 +859,29 @@ export function ChartPanel({
       color: DRAW_COLORS[type],
     });
   };
+
+  useEffect(() => {
+    if (!manualTradePrompt) return;
+    const handlePointerDown = (evt: PointerEvent) => {
+      if (manualMenuRef.current && manualMenuRef.current.contains(evt.target as Node)) {
+        return;
+      }
+      setManualTradePrompt(null);
+    };
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, [manualTradePrompt]);
+
+  useEffect(() => {
+    if (!manualTradePrompt) return;
+    const handleKey = (evt: KeyboardEvent) => {
+      if (evt.key === "Escape") {
+        setManualTradePrompt(null);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [manualTradePrompt]);
 
   const resetDrawingState = () => {
     setPendingPoints([]);
@@ -1088,7 +1316,7 @@ export function ChartPanel({
             timeVisible: true,
             secondsVisible: false,
             visible: true,
-            tickMarkFormatter: (t: Time) => formatTimeTick(t, true, clockTz),
+            tickMarkFormatter: (t: Time) => formatTimeTick(t, true, clockTzRef.current),
           },
           grid: {
             vertLines: { color: "#111827" },
@@ -1128,9 +1356,10 @@ export function ChartPanel({
           : null;
         setMarkersPluginReady((v) => v + 1);
 
-        if (candles.length > 0) {
+        const initialCandles = candlesSnapshotRef.current;
+        if (initialCandles.length > 0) {
           series.setData(
-            candles.map((c) => ({
+            initialCandles.map((c) => ({
               time: (c.t / 1000) as UTCTimestamp,
               open: c.o,
               high: c.h,
@@ -1405,7 +1634,7 @@ export function ChartPanel({
           position: trade.direction === 'buy' ? ('belowBar' as const) : ('aboveBar' as const),
           color: trade.direction === 'buy' ? '#10b981' : '#f97316',
           shape: trade.direction === 'buy' ? ('arrowUp' as const) : ('arrowDown' as const),
-          text: trade.direction === 'buy' ? 'BUY' : 'SELL',
+          text: formatTradeMarkerLabel(trade),
           id: `trade-${trade.id ?? idx}`,
         })),
       );
@@ -1428,6 +1657,8 @@ export function ChartPanel({
     overlays.tradeMarkers,
     markersPluginReady,
     candles,
+    selectedSetup,
+    matchesSelectedSetup,
   ]);
 
   useEffect(() => {
@@ -1566,12 +1797,19 @@ export function ChartPanel({
       const ms = convertCoordTime(time);
       setHoverTzTime(ms ? formatWithTz(ms, clockTz, TIME_LABEL_FORMAT) : null);
       const pt = param?.point;
+      let cursorPrice: number | null = null;
       if (pt && Number.isFinite(pt.x) && Number.isFinite(pt.y)) {
         setHoverPoint({ x: pt.x, y: pt.y });
+        const coordPrice = seriesRef.current?.coordinateToPrice(pt.y) ?? null;
+        if (typeof coordPrice === "number" && Number.isFinite(coordPrice)) {
+          cursorPrice = coordPrice;
+        }
       } else {
         setHoverPoint(null);
       }
       const series = seriesRef.current;
+      let barPrice: number | null = null;
+      let derivedCandle: Candle | null = null;
       if (series && param?.seriesData) {
         const bar: any = param.seriesData.get(series);
         if (bar) {
@@ -1581,43 +1819,37 @@ export function ChartPanel({
               : typeof bar.value === "number"
                 ? bar.value
                 : null;
-          setHoverPrice(price);
+          barPrice = price;
           if (ms && typeof bar.open === "number" && typeof bar.high === "number" && typeof bar.low === "number" && typeof bar.close === "number") {
-            setHoverCandle({
+            derivedCandle = {
               t: ms,
               o: bar.open,
               h: bar.high,
               l: bar.low,
               c: bar.close,
               v: typeof bar.volume === "number" ? bar.volume : 0,
-            });
+            };
           } else if (price != null && ms) {
-            setHoverCandle({
+            derivedCandle = {
               t: ms,
               o: price,
               h: price,
               l: price,
               c: price,
               v: 0,
-            });
-          } else {
-            setHoverCandle(null);
+            };
           }
-        } else {
-          setHoverPrice(null);
-          setHoverCandle(null);
         }
-      } else {
-        const fallbackPrice = typeof param?.price === "number" ? param.price : null;
-        setHoverPrice(fallbackPrice);
-        setHoverCandle(null);
       }
+      setHoverCandle(derivedCandle);
+      const fallbackPrice = typeof param?.price === "number" ? param.price : null;
+      setHoverPrice(cursorPrice ?? barPrice ?? fallbackPrice);
     };
     chart.subscribeCrosshairMove(handler);
     return () => {
       chart.unsubscribeCrosshairMove(handler);
     };
-  }, [markersPluginReady, clockTz]);
+  }, [markersPluginReady, clockTz, convertCoordTime]);
 
   useEffect(() => {
     const updateClock = () => {
@@ -1811,6 +2043,7 @@ export function ChartPanel({
     chartHeight,
     chartWidth,
     swings,
+    matchesSelectedSetup,
   ]);
 
   useEffect(() => {
@@ -1943,7 +2176,7 @@ export function ChartPanel({
       setSignalPrompt(latest);
       setSignalPromptScore(null);
     }
-  }, [promptSignals, notificationsEnabled, bias, premiumDiscount, latestPrice, candles, backtest?.enabled, backtest?.autoTrade, signalPrompt]);
+  }, [promptSignals, notificationsEnabled, bias, premiumDiscount, latestPrice, candles, backtest?.enabled, backtest?.autoTrade, signalPrompt, enterDemoTradeFromSignal]);
 
   useEffect(() => {
     if (!notificationsEnabled || !signalPrompt) return;
@@ -1966,6 +2199,23 @@ export function ChartPanel({
       : null;
   const clockLabel = getClockLabel(clockTz);
   const hoverPriceLabel = hoverPrice != null ? formatPrice(hoverPrice) : null;
+  const manualMenuStyle = manualTradePrompt
+    ? (() => {
+        const containerWidth = containerRef.current?.clientWidth ?? manualTradePrompt.x + 200;
+        const containerHeight = containerRef.current?.clientHeight ?? manualTradePrompt.y + 200;
+        const MENU_WIDTH = 180;
+        const MENU_HEIGHT = 130;
+        const left = Math.min(
+          Math.max(8, manualTradePrompt.x + 10),
+          Math.max(8, containerWidth - MENU_WIDTH - 8),
+        );
+        const top = Math.min(
+          Math.max(8, manualTradePrompt.y + 10),
+          Math.max(8, containerHeight - MENU_HEIGHT - 8),
+        );
+        return { left, top };
+      })()
+    : null;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
@@ -1981,6 +2231,7 @@ export function ChartPanel({
         onPointerLeave={() => {
           if (panMode) setIsPanning(false);
         }}
+        onContextMenu={handleChartContextMenu}
       >
         <div ref={containerRef} className="h-full w-full" />
         <div
@@ -1988,7 +2239,7 @@ export function ChartPanel({
             absolute inset-0 z-20
           `}
           style={{
-            pointerEvents: overlayActive ? "auto" : "none",
+            pointerEvents: overlayActive || manualTradePrompt ? "auto" : "none",
             cursor: overlayCursor,
           }}
           onPointerDown={handlePointerDown}
@@ -2159,7 +2410,7 @@ export function ChartPanel({
             Show Blueprint Magnet
           </button>
         )}
-        {(dataSource || hoverCandle || backtest?.enabled) && (
+        {(dataSource || hoverCandle || backtest?.enabled || notificationsEnabled) && (
           <div className="pointer-events-none absolute left-2 top-2 z-30 space-y-1 text-[11px]">
             {dataSource && (
               <div className="rounded bg-black/70 px-2 py-1 text-[11px] text-zinc-200 shadow">
@@ -2191,6 +2442,31 @@ export function ChartPanel({
                 <span className="text-emerald-300">{backtest?.playing ? 'Playing' : 'Paused'}</span>
               </div>
             )}
+            {notificationsEnabled && (
+              <div className="rounded bg-emerald-900/60 px-2 py-1 text-[10px] text-emerald-100 shadow">
+                {lastSignal ? (
+                  <>
+                    Last alert · {formatWithTz(lastSignal.time, clockTz, TIME_LABEL_FORMAT)} ·{' '}
+                    {lastSignal.setup ?? lastSignal.direction.toUpperCase()}
+                  </>
+                ) : (
+                  'Entry alerts enabled • awaiting setup'
+                )}
+              </div>
+            )}
+            {notificationsEnabled && backtest?.enabled && (
+              <div className="rounded bg-amber-900/70 px-2 py-1 text-[10px] text-amber-100 shadow">
+                Alerts follow backtest playback
+              </div>
+            )}
+          </div>
+        )}
+        {hoverPoint && (
+          <div className="pointer-events-none absolute inset-0 z-30">
+            <div
+              className="absolute left-0 right-0 border-t border-dashed border-white/30"
+              style={{ top: `${Math.max(0, hoverPoint.y)}px` }}
+            />
           </div>
         )}
         {hoverPriceLabel && hoverPoint && (
@@ -2201,6 +2477,41 @@ export function ChartPanel({
             }}
           >
             {hoverPriceLabel}
+          </div>
+        )}
+        {manualTradePrompt && manualMenuStyle && (
+          <div
+            ref={manualMenuRef}
+            className="pointer-events-auto absolute z-40 w-44 rounded border border-emerald-500/40 bg-black/85 p-3 text-xs text-white shadow-lg shadow-emerald-500/20"
+            style={{ left: manualMenuStyle.left, top: manualMenuStyle.top }}
+          >
+            <div className="text-[10px] uppercase tracking-wide text-emerald-300">Manual trade</div>
+            <div className="mt-1 text-[11px] text-zinc-400">
+              {formatWithTz(manualTradePrompt.time, clockTz, TIME_LABEL_FORMAT)}
+            </div>
+            <div className="text-base font-semibold text-white">
+              {formatPrice(manualTradePrompt.price)}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button
+                className="flex-1 rounded border border-emerald-500/60 bg-emerald-500/10 py-1 text-[11px] font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
+                onClick={() => handleManualTrade("buy")}
+              >
+                Buy
+              </button>
+              <button
+                className="flex-1 rounded border border-rose-500/60 bg-rose-500/10 py-1 text-[11px] font-semibold text-rose-200 transition hover:bg-rose-500/20"
+                onClick={() => handleManualTrade("sell")}
+              >
+                Sell
+              </button>
+            </div>
+            <button
+              className="mt-2 w-full rounded border border-zinc-600 bg-zinc-900/70 py-1 text-[11px] font-semibold text-zinc-300 transition hover:bg-zinc-800"
+              onClick={() => setManualTradePrompt(null)}
+            >
+              Cancel
+            </button>
           </div>
         )}
     {signalPrompt && (
@@ -2297,11 +2608,14 @@ export function ChartPanel({
               <button
                 className="flex-1 rounded border border-emerald-500/60 bg-emerald-500/10 py-1 font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
                 onClick={() => {
+                  if (signalPrompt) {
+                    enterDemoTradeFromSignal(signalPrompt, {}, true);
+                  }
                   setSignalPrompt(null);
                   setSignalPromptScore(null);
                 }}
               >
-                Mark taken
+                Take trade
               </button>
               <button
                 className="flex-1 rounded border border-zinc-600 bg-zinc-800/70 py-1 font-semibold text-zinc-200 transition hover:bg-zinc-700"
@@ -2418,44 +2732,44 @@ export function ChartPanel({
             >
               Auto trade: {backtest.autoTrade ? "ON" : "OFF"}
             </button>
-            <span>Auto %</span>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={autoStartPct}
-              onChange={(e) => setAutoStartPct(Number(e.target.value))}
-              className="w-14 rounded bg-black/60 px-1 py-0.5 text-xs text-white outline-none"
-              disabled={!backtest.autoTrade}
-            />
-            <span className="text-white/50">-</span>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={autoEndPct}
-              onChange={(e) => setAutoEndPct(Number(e.target.value))}
-              className="w-14 rounded bg-black/60 px-1 py-0.5 text-xs text-white outline-none"
-              disabled={!backtest.autoTrade}
-            />
-            {backtest.autoTrade && (
-              <button
-                className="rounded border border-emerald-400/60 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-50"
-                onClick={runAutoBacktest}
-                disabled={autoRunning}
-              >
-                {autoRunning ? "Running…" : "Auto trade"}
-              </button>
-            )}
-            {autoSummary && (
-              <span className="text-emerald-200">
-                {autoSummary.trades} trades (W {autoSummary.wins} / L {autoSummary.losses})
-              </span>
-            )}
-            {autoError && <span className="text-red-300">{autoError}</span>}
-          </div>
+              <span>Auto %</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={autoStartPct}
+                onChange={(e) => setAutoStartPct(Number(e.target.value))}
+                className="w-14 rounded bg-black/60 px-1 py-0.5 text-xs text-white outline-none"
+                disabled={!backtest.autoTrade}
+              />
+              <span className="text-white/50">-</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={autoEndPct}
+                onChange={(e) => setAutoEndPct(Number(e.target.value))}
+                className="w-14 rounded bg-black/60 px-1 py-0.5 text-xs text-white outline-none"
+                disabled={!backtest.autoTrade}
+              />
+              {backtest.autoTrade && (
+                <button
+                  className="rounded border border-emerald-400/60 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-50"
+                  onClick={runAutoBacktest}
+                  disabled={autoRunning}
+                >
+                  {autoRunning ? "Running…" : "Auto trade"}
+                </button>
+              )}
+              {autoSummary && (
+                <span className="text-emerald-200">
+                  {autoSummary.trades} trades (W {autoSummary.wins} / L {autoSummary.losses})
+                </span>
+              )}
+              {autoError && <span className="text-red-300">{autoError}</span>}
+            </div>
         )}
         <div className="flex items-center gap-2 px-3 text-right text-sm font-semibold text-white drop-shadow">
           <select
@@ -2476,6 +2790,46 @@ export function ChartPanel({
           </div>
         </div>
       </div>
+      {setupStatsEntries.length > 0 && (
+        <div className="border-t border-white/5 bg-[#050a1a]/95 px-3 py-3 text-[11px] text-white">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Setup telemetry</span>
+            <button
+              type="button"
+              className="rounded border border-emerald-500/60 px-2 py-0.5 text-[10px] font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
+              onClick={copySetupStats}
+            >
+              Copy
+            </button>
+          </div>
+          <div className="max-h-48 overflow-y-auto pr-1">
+            <div className="grid gap-1 text-[11px] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {setupStatsEntries.map((entry) => (
+                <div
+                  key={entry.setup}
+                  className="flex items-start justify-between rounded border border-white/10 bg-black/40 px-2 py-1 text-[11px]"
+                >
+                  <div className="pr-2">
+                    <div className="font-semibold text-white">{entry.setup}</div>
+                    <div className="text-[10px] text-zinc-400">
+                      {entry.total} trade{entry.total === 1 ? "" : "s"} • {entry.winRate.toFixed(0)}% win
+                    </div>
+                  </div>
+                  <div className="text-right text-[10px] leading-tight text-zinc-300">
+                    <div>
+                      W <span className="text-emerald-300">{entry.wins}</span> / L{" "}
+                      <span className="text-rose-300">{entry.losses}</span>
+                    </div>
+                    <div className="text-[10px] text-zinc-400">
+                      avg {entry.wins ? entry.avgWin.toFixed(2) : "-"} / {entry.losses ? entry.avgLoss.toFixed(2) : "-"}R
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2487,6 +2841,24 @@ function formatPrice(value: number) {
   if (abs >= 1) return value.toFixed(2);
   if (abs >= 0.01) return value.toFixed(4);
   return value.toFixed(6);
+}
+
+function formatTradeMarkerLabel(trade: BacktestTrade) {
+  const base = trade.direction === "buy" ? "BUY" : "SELL";
+  const code = getTradeStatusCode(trade);
+  return code ? `${base}(${code})` : base;
+}
+
+function getTradeStatusCode(trade: BacktestTrade) {
+  if (trade.result === "win") return "W";
+  if (trade.result === "loss") return "L";
+  if (trade.result === "breakeven") return "B";
+  const status = trade.status ?? (trade.result ? "closed" : "active");
+  if (status === "planned") return "P";
+  if (status === "active") return "T";
+  if (status === "canceled") return "C";
+  if (status === "closed") return "C";
+  return "";
 }
 
 function simulateTradeOutcome(

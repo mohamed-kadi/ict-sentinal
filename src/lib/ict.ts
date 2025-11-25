@@ -14,6 +14,7 @@ import {
   Swing,
 } from './types';
 import { dayStats, groupByDay } from './utils';
+import type { OptimizationWeights } from './tradeMemory';
 
 export type SessionOpenLevels = {
   [dateKey: string]: {
@@ -28,6 +29,29 @@ export type SmtSignal = {
   type: 'buy' | 'sell';
   reason: string;
 };
+
+type TradeMemoryAdapter = {
+  getOptimizationParams(): OptimizationWeights;
+};
+
+let tradeMemoryInstance: TradeMemoryAdapter | null | undefined;
+
+function getTradeMemoryInstance(): TradeMemoryAdapter | null {
+  if (tradeMemoryInstance !== undefined) return tradeMemoryInstance;
+  if (typeof window !== 'undefined') {
+    tradeMemoryInstance = null;
+    return tradeMemoryInstance;
+  }
+  try {
+    // This branch only runs in Node (server); bundler will include the module.
+    const mod = require('./tradeMemory') as { TradeMemory: new () => TradeMemoryAdapter };
+    tradeMemoryInstance = new mod.TradeMemory();
+  } catch (err) {
+    console.warn('[ICT] TradeMemory unavailable', err);
+    tradeMemoryInstance = null;
+  }
+  return tradeMemoryInstance;
+}
 
 export function computeBias(candles: Candle[]): Bias {
   if (candles.length < 5) {
@@ -246,6 +270,7 @@ export function detectSignals(
     console.info('[ICT] detectSignals debug ON');
   }
   const atrValues = computeAtr(candles, 14);
+  const optimizationWeights: OptimizationWeights = getTradeMemoryInstance()?.getOptimizationParams() ?? {};
   const lastSignalIndex: Record<string, number> = {};
   const setupPriority = new Map<string, number>([
     ['Bias + OB/FVG + Session', 5],
@@ -280,6 +305,9 @@ export function detectSignals(
   const signalsPerDay: Record<string, number> = {};
   const tierTwoSessions: Record<string, number> = {};
   const weeklyPdRange = getWeeklyPdRange(htfLevels);
+  const byDay = groupByDay(candles);
+  const dayKeys = Object.keys(byDay).sort();
+  const dayIndexMap = new Map(dayKeys.map((key, idx) => [key, idx]));
   const getPdRange = (barIndex: number) =>
     computeAnchoredPdRange(candles, swings, barIndex) ??
     premiumRange ??
@@ -351,7 +379,35 @@ export function detectSignals(
   let biasFreeze = false;
   let biasFreezeUntil: number | null = null;
   let sweepContext: LiquiditySweep | null = null;
+  let atrForFilter = 0;
   const pushSignal = (s: Signal, barIndex: number) => {
+    if (!s.session) {
+      s.session = currentSignalContext.sessionLabel;
+    }
+    if (!s.bias) {
+      s.bias = currentSignalContext.biasLabel;
+    }
+    if (s.setup) {
+      const stats = optimizationWeights[s.setup];
+      const stop = s.stop ?? null;
+      const risk = stop != null ? (s.direction === 'buy' ? s.price - stop : stop - s.price) : null;
+      const approxTarget =
+        s.tp1 ??
+        (risk && risk > 0 ? (s.direction === 'buy' ? s.price + risk * 2 : s.price - risk * 2) : undefined);
+      const filterOutcome = evaluateSetupFilters(
+        s.setup,
+        s.direction,
+        s.price,
+        approxTarget,
+        stats,
+        gaps,
+        atrForFilter,
+      );
+      if (!filterOutcome) {
+        return;
+      }
+      s.sizeMultiplier = (s.sizeMultiplier ?? 1) * filterOutcome.sizeMultiplier;
+    }
     if (enforceSessionOpenFilter) {
       const priceContext = currentPrice ?? s.price;
       if (currentDayLevels && !respectsSessionOpen(s.direction, currentDayLevels, priceContext)) {
@@ -479,7 +535,9 @@ export function detectSignals(
     const atrLocal = atrValues[barIndex] ?? 0;
     const sizeBaseline = Math.max(Math.abs(s.price) * 0.0008, 1e-6);
     const rawSize = atrLocal > 0 ? Math.min(2.5, Math.max(0.5, atrLocal / sizeBaseline)) : 1;
-    s.sizeMultiplier = tierOne ? Math.max(0.75, Math.min(1.5, rawSize)) : rawSize;
+    const baseSize = tierOne ? Math.max(0.75, Math.min(1.5, rawSize)) : rawSize;
+    const userMultiplier = s.sizeMultiplier ?? 1;
+    s.sizeMultiplier = baseSize * userMultiplier;
     signals.push(s);
     lastSignalIndex[setupKey] = barIndex;
     lastSignalBar = barIndex;
@@ -513,8 +571,9 @@ export function detectSignals(
     const bodyMid = (candle.h + candle.l) / 2;
     const bullishConfirm = direction === 'bullish' && candle.c > candle.o && candle.c >= bodyMid;
     const bearishConfirm = direction === 'bearish' && candle.c < candle.o && candle.c <= bodyMid;
-    const atr = atrValues[i] ?? 0;
-    const proximity = Math.max(atr, Math.abs(candle.c) * 0.0005);
+    const currentAtr = atrValues[i] ?? 0;
+    atrForFilter = currentAtr;
+    const proximity = Math.max(currentAtr, Math.abs(candle.c) * 0.0005);
     const nearLevel = (level?: number | null) =>
       level != null && Math.abs(candle.c - level) <= proximity;
     const pdRange = getPdRange(i);
@@ -650,12 +709,23 @@ export function detectSignals(
     let cachedShift: StructureShift | null | undefined;
     const getLastShift = () => {
       if (cachedShift === undefined) {
-        cachedShift = swings?.length ? detectStructureShifts(candles.slice(0, i + 1), swings).at(-1) ?? null : null;
+        const sliceStart = Math.max(0, i - 300);
+        cachedShift = swings?.length
+          ? detectStructureShifts(candles.slice(sliceStart, i + 1), swings, currentAtr).at(-1) ?? null
+          : null;
       }
       return cachedShift;
     };
 
-    if (biasLabel === 'Bullish' && sessionAllowed && bullishConfirm && htfBuyZone) {
+    const shiftNow = getLastShift();
+    if (
+      biasLabel === 'Bullish' &&
+      sessionAllowed &&
+      bullishConfirm &&
+      htfBuyZone &&
+      shiftNow?.direction === 'bullish' &&
+      hasClearPath(candle.c, candle.c + proximity * 3, 'buy', gaps)
+    ) {
       const tappedOB = blocks.find(
         (b) => b.type === 'bullish' && b.endTime <= candle.t && candle.l <= b.high && candle.h >= b.low,
       );
@@ -666,14 +736,15 @@ export function detectSignals(
         const stop = findRecentSwing(swings, 'low', candle.t) ?? prev.l;
         const entry = candle.c;
         const risk = entry - stop;
+        if (risk <= 0) continue;
         pushSignal({
           time: candle.t,
           price: candle.c,
           direction: 'buy',
           setup: 'Bias + OB/FVG + Session',
           stop,
-          tp1: risk > 0 ? entry + risk : undefined,
-          tp2: risk > 0 ? entry + risk * 2 : undefined,
+          tp1: entry + risk,
+          tp2: entry + risk * 2,
           basis: [
             'Bias bullish',
             tappedOB ? 'Tapped Bullish OB' : 'Tapped Bullish FVG',
@@ -683,7 +754,15 @@ export function detectSignals(
       }
     }
 
-    if (biasLabel === 'Bearish' && sessionAllowed && bearishConfirm && htfSellZone) {
+    const shiftNowSell = shiftNow;
+    if (
+      biasLabel === 'Bearish' &&
+      sessionAllowed &&
+      bearishConfirm &&
+      htfSellZone &&
+      shiftNowSell?.direction === 'bearish' &&
+      hasClearPath(candle.c, candle.c - proximity * 3, 'sell', gaps)
+    ) {
       const tappedOB = blocks.find(
         (b) => b.type === 'bearish' && b.endTime <= candle.t && candle.h >= b.low && candle.l <= b.high,
       );
@@ -694,14 +773,15 @@ export function detectSignals(
         const stop = findRecentSwing(swings, 'high', candle.t) ?? prev.h;
         const entry = candle.c;
         const risk = stop - entry;
+        if (risk <= 0) continue;
         pushSignal({
           time: candle.t,
           price: candle.c,
           direction: 'sell',
           setup: 'Bias + OB/FVG + Session',
           stop,
-          tp1: risk > 0 ? entry - risk : undefined,
-          tp2: risk > 0 ? entry - risk * 2 : undefined,
+          tp1: entry - risk,
+          tp2: entry - risk * 2,
           basis: [
             'Bias bearish',
             tappedOB ? 'Tapped Bearish OB' : 'Tapped Bearish FVG',
@@ -713,9 +793,9 @@ export function detectSignals(
 
     // CHoCH + FVG return + OTE confluence
     if (includeChoChFvgOte && swings?.length && gaps.length && sessionAllowed) {
-      const lastShift = getLastShift();
+      const lastShiftVal = shiftNow;
       const recentGap = gaps.findLast((g) => g.endTime <= candle.t);
-      if (lastShift && recentGap) {
+      if (lastShiftVal && recentGap) {
         const range = computePremiumDiscountRange(candles.slice(Math.max(0, i - 50), i + 1));
         if (range) {
           const oteHigh = range.high - (range.high - range.low) * 0.62;
@@ -725,7 +805,7 @@ export function detectSignals(
             candle.l <= Math.max(recentGap.top, recentGap.bottom) &&
             candle.h >= Math.min(recentGap.top, recentGap.bottom);
 
-          if (lastShift.direction === 'bullish' && inFvg && inOte && bullishConfirm && htfBuyZone) {
+          if (lastShiftVal.direction === 'bullish' && inFvg && inOte && bullishConfirm && htfBuyZone) {
             const stop = findRecentSwing(swings, 'low', candle.t) ?? prev.l;
             const entry = candle.c;
             const risk = entry - stop;
@@ -741,7 +821,7 @@ export function detectSignals(
             }, i);
           }
 
-          if (lastShift.direction === 'bearish' && inFvg && inOte && bearishConfirm && htfSellZone) {
+          if (lastShiftVal.direction === 'bearish' && inFvg && inOte && bearishConfirm && htfSellZone) {
             const stop = findRecentSwing(swings, 'high', candle.t) ?? prev.h;
             const entry = candle.c;
             const risk = stop - entry;
@@ -772,9 +852,12 @@ export function detectSignals(
       if (
         discountContext &&
         biasLabel === 'Bullish' &&
-        (shift?.direction === 'bullish' || sweepDown) &&
+        shift?.direction === 'bullish' &&
+        sweepDown &&
         bullishConfirm &&
-        htfBuyZone
+        htfBuyZone &&
+        currentSignalContext.isKillZone &&
+        hasClearPath(candle.c, candle.c + proximity * 2.5, 'buy', gaps)
       ) {
         const stop = Math.min(swingLow ?? candle.l, candle.l);
         const entry = candle.c;
@@ -794,9 +877,12 @@ export function detectSignals(
       if (
         premiumContext &&
         biasLabel === 'Bearish' &&
-        (shift?.direction === 'bearish' || sweepUp) &&
+        shift?.direction === 'bearish' &&
+        sweepUp &&
         bearishConfirm &&
-        htfSellZone
+        htfSellZone &&
+        currentSignalContext.isKillZone &&
+        hasClearPath(candle.c, candle.c - proximity * 2.5, 'sell', gaps)
       ) {
         const stop = Math.max(swingHigh ?? candle.h, candle.h);
         const entry = candle.c;
@@ -817,7 +903,13 @@ export function detectSignals(
     if (sweeps?.length && sessionAllowed) {
       const lastSweep = lastSweepGlobal;
       if (lastSweep) {
-        if (lastSweep.direction === 'up' && bearishConfirm) {
+        if (
+          lastSweep.direction === 'up' &&
+          bearishConfirm &&
+          biasLabel === 'Bearish' &&
+          htfSellZone &&
+          currentSignalContext.isKillZone
+        ) {
           const stop = lastSweep.price * 1.0002;
           const entry = candle.c;
           const risk = stop - entry;
@@ -831,7 +923,13 @@ export function detectSignals(
             tp2: risk > 0 ? entry - risk * 2 : undefined,
             basis: ['EQH sweep', 'Looking for shift lower'].join(' • '),
           }, i);
-        } else if (lastSweep.direction === 'down' && bullishConfirm) {
+        } else if (
+          lastSweep.direction === 'down' &&
+          bullishConfirm &&
+          biasLabel === 'Bullish' &&
+          htfBuyZone &&
+          currentSignalContext.isKillZone
+        ) {
           const stop = lastSweep.price * 0.9998;
           const entry = candle.c;
           const risk = entry - stop;
@@ -892,9 +990,16 @@ export function detectSignals(
 
     if (sweeps?.length && swings?.length && sessionAllowed) {
       const lastSweep = lastSweepGlobal;
-      const lastShift = getLastShift();
+      const lastShift = shiftNow;
       if (lastSweep && lastShift && lastShift.time >= lastSweep.time) {
-        if (lastSweep.direction === 'up' && lastShift.direction === 'bearish' && bearishConfirm && htfSellZone) {
+        if (
+          lastSweep.direction === 'up' &&
+          lastShift.direction === 'bearish' &&
+          bearishConfirm &&
+          htfSellZone &&
+          currentSignalContext.isKillZone &&
+          hasClearPath(candle.c, candle.c - proximity * 3, 'sell', gaps)
+        ) {
           const stop = lastSweep.price * 1.0002;
           const entry = candle.c;
           const risk = stop - entry;
@@ -909,7 +1014,14 @@ export function detectSignals(
             basis: ['EQH sweep', 'CHoCH down'].join(' • '),
           }, i);
         }
-        if (lastSweep.direction === 'down' && lastShift.direction === 'bullish' && bullishConfirm && htfBuyZone) {
+        if (
+          lastSweep.direction === 'down' &&
+          lastShift.direction === 'bullish' &&
+          bullishConfirm &&
+          htfBuyZone &&
+          currentSignalContext.isKillZone &&
+          hasClearPath(candle.c, candle.c + proximity * 3, 'buy', gaps)
+        ) {
           const stop = lastSweep.price * 0.9998;
           const entry = candle.c;
           const risk = entry - stop;
@@ -927,8 +1039,23 @@ export function detectSignals(
       }
     }
 
+    const trendSeparation =
+      emaFast != null && emaSlow != null && Math.abs(emaSlow ?? candle.c) > 0
+        ? Math.abs(emaFast - emaSlow) / Math.max(Math.abs(emaSlow ?? candle.c), 1e-6)
+        : 0;
+    const hasTrendStrength = trendSeparation >= 0.001;
+    const lastShiftTrend = shiftNow;
     if (sessionAllowed && emaFast != null && emaSlow != null) {
-      if (emaFast > emaSlow && biasLabel !== 'Bearish' && candle.c >= emaFast && candle.l <= emaFast * 1.0005 && bullishConfirm) {
+      if (
+        emaFast > emaSlow &&
+        biasLabel === 'Bullish' &&
+        hasTrendStrength &&
+        candle.c >= emaFast &&
+        candle.l <= emaFast * 1.0005 &&
+        bullishConfirm &&
+        currentSignalContext.isKillZone &&
+        lastShiftTrend?.direction === 'bullish'
+      ) {
         const stop = Math.min(emaFast, candle.l, prev.l);
         const entry = candle.c;
         const risk = entry - stop;
@@ -946,7 +1073,16 @@ export function detectSignals(
           }, i);
         }
       }
-      if (emaFast < emaSlow && biasLabel !== 'Bullish' && candle.c <= emaFast && candle.h >= emaFast * 0.9995 && bearishConfirm) {
+      if (
+        emaFast < emaSlow &&
+        biasLabel === 'Bearish' &&
+        hasTrendStrength &&
+        candle.c <= emaFast &&
+        candle.h >= emaFast * 0.9995 &&
+        bearishConfirm &&
+        currentSignalContext.isKillZone &&
+        lastShiftTrend?.direction === 'bearish'
+      ) {
         const stop = Math.max(emaFast, candle.h, prev.h);
         const entry = candle.c;
         const risk = stop - entry;
@@ -967,7 +1103,16 @@ export function detectSignals(
     }
 
     if (sessionAllowed && isLondonOrNy && i - lastSignalBar > 6) {
-      if (institutionalBuyZone && bullishConfirm) {
+      const lastShift = shiftNow;
+      if (
+        institutionalBuyZone &&
+        bullishConfirm &&
+        biasLabel === 'Bullish' &&
+        htfBuyZone &&
+        lastShift?.direction === 'bullish' &&
+        currentSignalContext.isKillZone &&
+        hasClearPath(candle.c, candle.c + proximity * 3, 'buy', gaps)
+      ) {
         const stop = Math.min(asiaRange?.low ?? candle.l, findRecentSwing(swings, 'low', candle.t) ?? candle.l, candle.l);
         const entry = candle.c;
         const risk = entry - stop;
@@ -984,7 +1129,15 @@ export function detectSignals(
           }, i);
         }
       }
-      if (institutionalSellZone && bearishConfirm) {
+      if (
+        institutionalSellZone &&
+        bearishConfirm &&
+        biasLabel === 'Bearish' &&
+        htfSellZone &&
+        lastShift?.direction === 'bearish' &&
+        currentSignalContext.isKillZone &&
+        hasClearPath(candle.c, candle.c - proximity * 3, 'sell', gaps)
+      ) {
         const stop = Math.max(asiaRange?.high ?? candle.h, findRecentSwing(swings, 'high', candle.t) ?? candle.h, candle.h);
         const entry = candle.c;
         const risk = stop - entry;
@@ -1005,28 +1158,49 @@ export function detectSignals(
 
     const buyPowerContext = powerOfThree && powerOfThree.direction === 'buy' && (institutionalBuyZone || htfBuyZone);
     const sellPowerContext = powerOfThree && powerOfThree.direction === 'sell' && (institutionalSellZone || htfSellZone);
-    if (sessionAllowed && powerOfThree && (buyPowerContext || sellPowerContext)) {
+    if (
+      sessionAllowed &&
+      powerOfThree &&
+      (buyPowerContext || sellPowerContext) &&
+      currentSignalContext.isKillZone &&
+      shiftNow?.direction === (powerOfThree.direction === 'buy' ? 'bullish' : 'bearish') &&
+      hasClearPath(
+        powerOfThree.entry ?? candle.c,
+        powerOfThree.direction === 'buy'
+          ? (powerOfThree.entry ?? candle.c) + proximity * 3
+          : (powerOfThree.entry ?? candle.c) - proximity * 3,
+        powerOfThree.direction,
+        gaps,
+      )
+    ) {
       const stop = powerOfThree.direction === 'buy'
         ? Math.min(powerOfThree.anchorLow ?? candle.l, candle.l)
         : Math.max(powerOfThree.anchorHigh ?? candle.h, candle.h);
-      const entry = powerOfThree.entry ?? candle.c;
-      const risk = powerOfThree.direction === 'buy' ? entry - stop : stop - entry;
+      const entryPrice = powerOfThree.entry ?? candle.c;
+      const risk = powerOfThree.direction === 'buy' ? entryPrice - stop : stop - entryPrice;
       if (risk > 0) {
         pushSignal({
           time: candle.t,
-          price: entry,
+          price: entryPrice,
           direction: powerOfThree.direction,
           setup: 'Power of Three Kill Zone',
           stop,
-          tp1: powerOfThree.direction === 'buy' ? entry + risk : entry - risk,
-          tp2: powerOfThree.direction === 'buy' ? entry + risk * 2 : entry - risk * 2,
+          tp1: powerOfThree.direction === 'buy' ? entryPrice + risk : entryPrice - risk,
+          tp2: powerOfThree.direction === 'buy' ? entryPrice + risk * 2 : entryPrice - risk * 2,
           basis: [powerOfThree.reason, `Session ${session.label}`].join(' • '),
         }, i);
       }
     }
 
     if (sessionAllowed && isLondonOrNy && killZone) {
-      if (institutionalSellZone && bearishConfirm) {
+      if (
+        institutionalSellZone &&
+        bearishConfirm &&
+        biasLabel === 'Bearish' &&
+        discountContext &&
+        shiftNow?.direction === 'bearish' &&
+        hasClearPath(candle.c, candle.c - proximity * 3, 'sell', gaps)
+      ) {
         const recentHigh = Math.max(...candles.slice(Math.max(0, i - 6), i + 1).map((c) => c.h));
         const stop = Math.max(candle.h, recentHigh, prev.h);
         const entry = candle.c;
@@ -1045,7 +1219,14 @@ export function detectSignals(
           }, i);
         }
       }
-      if (institutionalBuyZone && bullishConfirm) {
+      if (
+        institutionalBuyZone &&
+        bullishConfirm &&
+        biasLabel === 'Bullish' &&
+        premiumContext &&
+        shiftNow?.direction === 'bullish' &&
+        hasClearPath(candle.c, candle.c + proximity * 3, 'buy', gaps)
+      ) {
         const recentLow = Math.min(...candles.slice(Math.max(0, i - 6), i + 1).map((c) => c.l));
         const stop = Math.min(candle.l, recentLow, prev.l);
         const entry = candle.c;
@@ -1281,7 +1462,7 @@ export function detectSignals(
 
     if (breakerBlocks?.length && swings?.length && sessionAllowed) {
       const breaker = breakerBlocks.findLast((b) => b.endTime <= candle.t);
-      const lastShift = getLastShift();
+      const lastShift = shiftNow;
       if (breaker && lastShift && lastShift.time >= breaker.startTime) {
         if (breaker.type === 'bullish' && lastShift.direction === 'bullish' && bullishConfirm && htfBuyZone) {
           const stop = breaker.low;
@@ -1437,12 +1618,40 @@ export function detectSignals(
       }
     }
 
-    if (htfLevels) {
-      const prevHigh = htfLevels.prevDayHigh;
-      const prevLow = htfLevels.prevDayLow;
-      if (prevHigh && candle.h > prevHigh && candle.c < prevHigh && direction === 'bearish') {
-        const stop = Math.max(candle.h, prevHigh);
-        const entry = candle.c;
+    const dayIdx = dayIndexMap.get(dateKey) ?? -1;
+    const TURTLE_LOOKBACK = 20;
+    let turtleHigh: number | null = null;
+    let turtleLow: number | null = null;
+    if (dayIdx > 0) {
+      const lookbackKeys = dayKeys.slice(Math.max(0, dayIdx - TURTLE_LOOKBACK), dayIdx);
+      if (lookbackKeys.length >= Math.min(TURTLE_LOOKBACK, 10)) {
+        const lookbackCandles = lookbackKeys.flatMap((key) => byDay[key] ?? []);
+        if (lookbackCandles.length) {
+          turtleHigh = Math.max(...lookbackCandles.map((c) => c.h));
+          turtleLow = Math.min(...lookbackCandles.map((c) => c.l));
+        }
+      }
+    }
+    const atrWindow = atrValues.slice(Math.max(0, i - 120), i);
+    const avgAtr = atrWindow.length ? atrWindow.reduce((sum, val) => sum + val, 0) / atrWindow.length : currentAtr;
+    const turtleRange =
+      turtleHigh != null && turtleLow != null && turtleHigh > turtleLow ? turtleHigh - turtleLow : null;
+    const strongTrend =
+      emaFast != null &&
+      emaSlow != null &&
+      Math.abs(emaFast - emaSlow) > Math.abs(emaSlow ?? candle.c) * 0.0025;
+    if (
+      sessionAllowed &&
+      turtleHigh != null &&
+      turtleLow != null &&
+      turtleRange != null &&
+      avgAtr > 0 &&
+      turtleRange <= avgAtr * 8 &&
+      !strongTrend
+    ) {
+      if (candle.h > turtleHigh && candle.c < turtleHigh && direction === 'bearish') {
+        const stop = Math.max(candle.h, turtleHigh);
+        const entry = Math.min(candle.c, turtleHigh);
         const risk = stop - entry;
         pushSignal({
           time: candle.t,
@@ -1452,12 +1661,11 @@ export function detectSignals(
           stop,
           tp1: risk > 0 ? entry - risk : undefined,
           tp2: risk > 0 ? entry - risk * 2 : undefined,
-          basis: ['Break above PDH', 'Close back below'].join(' • '),
+          basis: ['20-day high sweep', 'Close back below range'].join(' • '),
         }, i);
-      }
-      if (prevLow && candle.l < prevLow && candle.c > prevLow && direction === 'bullish') {
-        const stop = Math.min(candle.l, prevLow);
-        const entry = candle.c;
+      } else if (candle.l < turtleLow && candle.c > turtleLow && direction === 'bullish') {
+        const stop = Math.min(candle.l, turtleLow);
+        const entry = Math.max(candle.c, turtleLow);
         const risk = entry - stop;
         pushSignal({
           time: candle.t,
@@ -1467,7 +1675,7 @@ export function detectSignals(
           stop,
           tp1: risk > 0 ? entry + risk : undefined,
           tp2: risk > 0 ? entry + risk * 2 : undefined,
-          basis: ['Break below PDL', 'Close back above'].join(' • '),
+          basis: ['20-day low sweep', 'Close back above range'].join(' • '),
         }, i);
       }
     }
@@ -1578,8 +1786,8 @@ export function detectSignals(
       }
     }
 
-    if (sessionAllowed && atr > 0.00001) {
-      const momentumMove = Math.abs(candle.c - prev.c) >= atr * 0.8;
+    if (sessionAllowed && currentAtr > 0.00001) {
+      const momentumMove = Math.abs(candle.c - prev.c) >= currentAtr * 0.8;
       if (momentumMove && biasLabel === 'Bullish' && bullishConfirm) {
         const stop = Math.min(prev.l, candle.l);
         const entry = candle.c;
@@ -1704,7 +1912,13 @@ export function detectSignals(
         candle.o >= prev.c &&
         candle.c <= prev.l &&
         candle.o - candle.c > Math.abs(prev.c - prev.o);
-      if (bullEngulf && biasLabel !== 'Bearish') {
+      if (
+        bullEngulf &&
+        biasLabel === 'Bullish' &&
+        currentSignalContext.isKillZone &&
+        shiftNow?.direction === 'bullish' &&
+        hasClearPath(candle.c, candle.c + proximity * 2, 'buy', gaps)
+      ) {
         const stop = Math.min(prev.l, candle.l);
         const entry = candle.c;
         const risk = entry - stop;
@@ -1721,7 +1935,13 @@ export function detectSignals(
           }, i);
         }
       }
-      if (bearEngulf && biasLabel !== 'Bullish') {
+      if (
+        bearEngulf &&
+        biasLabel === 'Bearish' &&
+        currentSignalContext.isKillZone &&
+        shiftNow?.direction === 'bearish' &&
+        hasClearPath(candle.c, candle.c - proximity * 2, 'sell', gaps)
+      ) {
         const stop = Math.max(prev.h, candle.h);
         const entry = candle.c;
         const risk = stop - entry;
@@ -1795,7 +2015,11 @@ export function classifySession(date: Date, sessions: SessionZone[]): SessionZon
   return sessions.find((s) => hour >= s.startHour && hour < s.endHour) ?? null;
 }
 
-export function detectStructureShifts(candles: Candle[], swings: Swing[]): StructureShift[] {
+export function detectStructureShifts(
+  candles: Candle[],
+  swings: Swing[],
+  displacementAtr = 0,
+): StructureShift[] {
   if (candles.length === 0 || swings.length < 2) return [];
   const shifts: StructureShift[] = [];
   const sortedSwings = [...swings].sort((a, b) => a.time - b.time);
@@ -1806,9 +2030,11 @@ export function detectStructureShifts(candles: Candle[], swings: Swing[]): Struc
   let state: 'bullish' | 'bearish' | null = null;
 
   const hasDisplacement = (candle: Candle, level: number, dir: 'up' | 'down') => {
-    const range = candle.h - candle.l || 1;
-    if (dir === 'up') return candle.c > level && candle.c - level > range * 0.2;
-    return candle.c < level && level - candle.c > range * 0.2;
+    const atrThreshold = displacementAtr > 0 ? displacementAtr * 0.5 : null;
+    const defaultRange = (candle.h - candle.l || 1) * 0.2;
+    const threshold = atrThreshold ?? defaultRange;
+    if (dir === 'up') return candle.c > level && candle.c - level > threshold;
+    return candle.c < level && level - candle.c > threshold;
   };
 
   for (const candle of candles) {
@@ -2035,6 +2261,49 @@ function dedupeBlocks(blocks: OrderBlock[]) {
     if (!exists) unique.push(block);
   }
   return unique;
+}
+
+type SetupFilterOutcome = {
+  sizeMultiplier: number;
+};
+
+function evaluateSetupFilters(
+  setupName: string,
+  direction: 'buy' | 'sell',
+  entry: number,
+  tpTarget: number | undefined,
+  stats: OptimizationWeights[string] | undefined,
+  gaps: Gap[],
+  fallbackAtr: number,
+): SetupFilterOutcome | null {
+  if (stats && !stats.allowed) return null;
+  const projectedTarget =
+    tpTarget ??
+    (fallbackAtr > 0
+      ? direction === 'buy'
+        ? entry + fallbackAtr * 3
+        : entry - fallbackAtr * 3
+      : undefined);
+  if (projectedTarget != null && !hasClearPath(entry, projectedTarget, direction, gaps)) {
+    return null;
+  }
+  return { sizeMultiplier: stats?.sizeMultiplier ?? 1 };
+}
+
+function hasClearPath(currentPrice: number, targetPrice: number, direction: 'buy' | 'sell', gaps: Gap[]) {
+  if (!Number.isFinite(currentPrice) || !Number.isFinite(targetPrice)) return true;
+  if (direction === 'buy' && targetPrice <= currentPrice) return true;
+  if (direction === 'sell' && targetPrice >= currentPrice) return true;
+  return !gaps.some((gap) => {
+    if (direction === 'buy') {
+      return (
+        gap.type === 'bearish' &&
+        gap.bottom > currentPrice &&
+        gap.bottom < targetPrice
+      );
+    }
+    return gap.type === 'bullish' && gap.top < currentPrice && gap.top > targetPrice;
+  });
 }
 
 function computeAtr(candles: Candle[], period = 14): number[] {

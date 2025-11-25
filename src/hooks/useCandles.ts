@@ -16,8 +16,10 @@ async function fetchCandles(assetClass: AssetClass, symbol: string, timeframe: T
     throw new Error(msg || 'Unable to fetch candles');
   }
   const json = await res.json();
+  const raw = (json.candles ?? []) as Candle[];
+  const candles = [...raw].sort((a, b) => a.t - b.t);
   return {
-    candles: (json.candles ?? []) as Candle[],
+    candles,
     source: json.source,
     warning: json.warning,
     detail: json.detail,

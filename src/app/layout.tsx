@@ -18,7 +18,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <Script src="/lwc.js" strategy="beforeInteractive" />
+        <Script src="/lwc.js" strategy="afterInteractive" />
       </head>
       <body className={inter.className}>{children}</body>
     </html>

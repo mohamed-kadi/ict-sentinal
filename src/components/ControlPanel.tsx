@@ -19,6 +19,7 @@ export function ControlPanel() {
     setAllOverlays,
     notificationsEnabled,
     toggleNotifications,
+    clearTrades,
   } = useAppStore();
 
   return (
@@ -127,6 +128,43 @@ export function ControlPanel() {
             checked={backtest.enabled}
             onChange={() => setBacktest({ enabled: !backtest.enabled })}
           />
+        </div>
+        <button
+          className="mt-2 w-full rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-300 transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:opacity-50"
+          type="button"
+          onClick={() => {
+            clearTrades();
+            setBacktest({ cursor: 0, playing: false });
+          }}
+          disabled={!backtest.enabled && backtest.trades.length === 0 && backtest.cursor === 0}
+        >
+          Reset run
+        </button>
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            className="flex-1 rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-300 transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:opacity-50"
+            onClick={() => setBacktest({ playing: !backtest.playing })}
+            disabled={!backtest.enabled}
+          >
+            {backtest.playing ? 'Pause' : 'Play'}
+          </button>
+          <button
+            type="button"
+            className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-300 transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:opacity-50"
+            onClick={() => setBacktest({ cursor: Math.max(0, backtest.cursor - 1), playing: false })}
+            disabled={!backtest.enabled}
+          >
+            -1
+          </button>
+          <button
+            type="button"
+            className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-300 transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:opacity-50"
+            onClick={() => setBacktest({ cursor: backtest.cursor + 1, playing: false })}
+            disabled={!backtest.enabled}
+          >
+            +1
+          </button>
         </div>
         <div className="mt-2">
           <div className="mb-1 flex items-center justify-between text-xs">

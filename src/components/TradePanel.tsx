@@ -1,10 +1,10 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { useAppStore } from '@/state/useAppStore';
+import { useAppStore, type BacktestTrade } from '@/state/useAppStore';
 
 export function TradePanel() {
-  const { backtest, addTrade, setBacktest, clearTrades } = useAppStore();
+  const { backtest, addTrade, clearTrades, updateTrade } = useAppStore();
   const [direction, setDirection] = useState<'buy' | 'sell'>('buy');
   const [entry, setEntry] = useState('');
   const [stop, setStop] = useState('');
@@ -46,10 +46,29 @@ export function TradePanel() {
       stop: stopNum,
       target: targetNum,
       rMultiple,
+      setup: 'Manual Entry',
+      sessionLabel: 'Manual',
+      manual: true,
+      status: 'planned',
     });
     setEntry('');
     setStop('');
     setTarget('');
+  };
+  const closeTradeManually = (trade: BacktestTrade, exitPrice: number, exitTime: number) => {
+    const size = trade.positionSize ?? 1;
+    const pnlPerUnit = trade.direction === 'buy' ? exitPrice - trade.entry : trade.entry - exitPrice;
+    const pnl = pnlPerUnit * size;
+    let result: BacktestTrade['result'];
+    if (Math.abs(pnlPerUnit) < 1e-8) result = 'breakeven';
+    else if (pnlPerUnit > 0) result = 'win';
+    else result = 'loss';
+    updateTrade(trade.id, {
+      status: 'closed',
+      result,
+      pnl,
+      exitTime,
+    });
   };
 
   const wins = backtest.trades.filter((t) => t.result === 'win').length;
@@ -140,18 +159,71 @@ export function TradePanel() {
               <div className="text-zinc-300">
                 {t.entry.toFixed(2)} / SL {t.stop.toFixed(2)} / TP {t.target.toFixed(2)}
               </div>
-              <div className="mt-1 text-xs">
-                {t.result ? (
-                  <span className={t.result === 'win' ? 'text-emerald-300' : 'text-red-300'}>
-                    {t.result.toUpperCase()} {t.pnl != null ? `(${t.pnl.toFixed(4)})` : ''}
-                  </span>
-                ) : (
-                  <span className="text-zinc-400">Open</span>
-                )}
-              </div>
+              <TradeStatusRow
+                trade={t}
+                onClose={(price, ts) => closeTradeManually(t, price, ts)}
+                onCancel={() => updateTrade(t.id, { status: 'closed', result: 'breakeven', pnl: 0, exitTime: Date.now() })}
+              />
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+function TradeStatusRow({
+  trade,
+  onClose,
+  onCancel,
+}: {
+  trade: BacktestTrade;
+  onClose: (exitPrice: number, exitTime: number) => void;
+  onCancel: () => void;
+}) {
+  const status = trade.status ?? (trade.result ? 'closed' : 'active');
+  const canCloseManually = status === 'active' && !trade.result && trade.manual;
+  const handleManualClose = () => {
+    const defaultPrice = trade.entry.toFixed(4);
+    const exitStr = window.prompt('Enter exit price to close the trade', defaultPrice);
+    if (!exitStr) return;
+    const exitPrice = Number(exitStr);
+    if (!Number.isFinite(exitPrice)) return;
+    onClose(exitPrice, Date.now());
+  };
+  return (
+    <div className="mt-2 text-xs">
+      {status === 'planned' && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-amber-300">Planned (waiting for entry)</span>
+          <button
+            className="rounded border border-zinc-600 px-2 py-0.5 text-[10px] font-semibold text-zinc-200"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      {status === 'active' && !trade.result && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sky-300">Taken</span>
+          {canCloseManually && (
+            <button
+              className="rounded border border-zinc-600 px-2 py-0.5 text-[10px] font-semibold text-zinc-200"
+              onClick={handleManualClose}
+            >
+              Close trade
+            </button>
+          )}
+        </div>
+      )}
+      {status === 'canceled' && (
+        <span className="text-zinc-400">Cancelled</span>
+      )}
+      {status === 'closed' && trade.result && (
+        <span className={trade.result === 'win' ? 'text-emerald-300' : trade.result === 'loss' ? 'text-red-300' : 'text-zinc-300'}>
+          {trade.result.toUpperCase()} {trade.pnl != null ? `(${trade.pnl.toFixed(4)})` : ''}
+        </span>
       )}
     </div>
   );

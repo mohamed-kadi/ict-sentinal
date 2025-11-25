@@ -51,6 +51,8 @@ export type Signal = {
   tp3?: number;
   tp4?: number;
   sizeMultiplier?: number;
+  session?: string | null;
+  bias?: Bias['label'];
 };
 
 export type SessionZone = {

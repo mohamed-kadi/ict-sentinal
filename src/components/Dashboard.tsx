@@ -7,7 +7,7 @@ import { TopBar } from './TopBar';
 import { BacktestControls } from './BacktestControls';
 import { InsightPanel } from './InsightPanel';
 import { useAppStore } from '@/state/useAppStore';
-import type { AssetClass } from '@/lib/types';
+import type { AssetClass, Candle } from '@/lib/types';
 import { useCandles } from '@/hooks/useCandles';
 import { SESSION_ZONES } from '@/lib/config';
 import {
@@ -25,6 +25,8 @@ import {
 } from '@/lib/ict';
 import { evaluateIctScanner } from '@/lib/ictScanner';
 
+const EMPTY_CANDLES: Candle[] = [];
+
 export function Dashboard() {
   const {
     assetClass,
@@ -38,7 +40,7 @@ export function Dashboard() {
     toggleSidebar,
   } = useAppStore();
   const { data: candleRes, isLoading, error } = useCandles(assetClass, symbol, timeframe);
-  const candles = candleRes?.candles ?? [];
+  const candles = candleRes?.candles ?? EMPTY_CANDLES;
   const source = candleRes?.source;
 
   useEffect(() => {

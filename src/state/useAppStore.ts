@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import { AssetClass, Timeframe, Drawing, DrawingType } from '@/lib/types';
+import { AssetClass, Timeframe, Drawing, DrawingType, Bias } from '@/lib/types';
 
 type OverlayKey =
   | 'liquidity'
@@ -37,6 +37,10 @@ export type BacktestTrade = {
   partialHit?: boolean;
   openTime?: number;
   positionSize?: number;
+  sessionLabel?: string | null;
+  biasLabel?: Bias['label'];
+  manual?: boolean;
+  status?: 'planned' | 'active' | 'closed' | 'canceled';
 };
 
 export type BacktestState = {
@@ -61,6 +65,7 @@ type AppState = {
   drawings: Drawing[];
   clockTz: string;
   notificationsEnabled: boolean;
+  optimizerEnabled: boolean;
   setAssetClass: (asset: AssetClass) => void;
   setSymbol: (symbol: string) => void;
   setTimeframe: (tf: Timeframe) => void;
@@ -76,6 +81,7 @@ type AppState = {
   setClockTz: (tz: string) => void;
   setAllOverlays: (value: boolean) => void;
   toggleNotifications: () => void;
+  toggleOptimizer: () => void;
   updateTrade: (id: string, patch: Partial<BacktestTrade>) => void;
 };
 
@@ -103,6 +109,7 @@ export const useAppStore = create<AppState>((set) => ({
   drawings: [],
   clockTz: 'America/New_York',
   notificationsEnabled: true,
+  optimizerEnabled: true,
   setAssetClass: (assetClass) => set({ assetClass }),
   setSymbol: (symbol) => set({ symbol }),
   setTimeframe: (timeframe) => set({ timeframe }),
@@ -157,5 +164,9 @@ export const useAppStore = create<AppState>((set) => ({
   toggleNotifications: () =>
     set((state) => ({
       notificationsEnabled: !state.notificationsEnabled,
+    })),
+  toggleOptimizer: () =>
+    set((state) => ({
+      optimizerEnabled: !state.optimizerEnabled,
     })),
 }));

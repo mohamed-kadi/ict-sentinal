@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { Bias, Timeframe, AssetClass } from '@/lib/types';
 import { CRYPTO_SYMBOLS, FOREX_SYMBOLS, STOCK_SYMBOLS } from '@/lib/config';
 import clsx from 'clsx';
@@ -109,11 +110,14 @@ export function TopBar({ symbol, timeframe, bias }: Props) {
             onClick={() => setSymbol(s)}
           >
             {SYMBOL_LOGOS[s] ? (
-              <img
-                src={SYMBOL_LOGOS[s]}
+              <Image
+                src={SYMBOL_LOGOS[s]!}
                 alt={s}
+                width={20}
+                height={20}
                 className="h-5 w-5 rounded-full bg-white/10 object-contain"
                 loading="lazy"
+                sizes="20px"
               />
             ) : (
               <span>•</span>
