@@ -12,6 +12,7 @@ TWELVE_DATA_KEY=your_key   # preferred
 ALPHA_VANTAGE_KEY=your_key
 ```
 4) (Optional) Drop reproducible candle data into `public/backtest-sample.json` (same structure as the sample file) when you need to share exact backtests.
+5) Lint/fix CI rules locally via `npm run lint` (Next.js 16 requires Node ≥20.9).
 
 ## Documentation
 - Technical guide: `docs/TECHNICAL.md`
@@ -25,16 +26,19 @@ ALPHA_VANTAGE_KEY=your_key
 - API routes:
   - `/api/crypto/klines` → Binance public OHLC (no key)
   - `/api/forex/klines` → TwelveData (free key) or Alpha Vantage fallback
+  - `/api/trade-memory` → local JSON persistence for trade outcomes (feeds the optimization filters shown on the chart)
 
 ## Features in this cut
 - Symbol/timeframe selector (BTC/ETH/SOL/XRP + EURUSD/GBPUSD/USDJPY/XAUUSD; 1m→1D).
 - ICT overlays: swings/liquidity, FVG detection, heuristic order blocks, session windows, daily bias, rule-based buy/sell markers. The overlay drawer now includes toggles for inversion-FVG signals and trade markers so you can declutter the main chart when needed.
+- Entry alerts: React to the same feed used by auto-trade/backtest. When Backtest is off, alerts display the latest real-time setup, and the chart header shows the timestamp of the last alert so you instantly know if signals are flowing.
 - Backtest mode: scrubs through loaded history with play/pause/step and speed control. Auto-trade controls let you replay any percentage slice of history (0–100 by default) and optional partial scaling logic feeds the paper-trade ledger automatically.
 - Blueprint magnet: movable, resizable mini-window that shows the active candle blueprint (date, time, OHLC range) and serves as the docking point for upcoming order-book/footprint data without covering the main chart.
 - Insight panel showing counts and latest setups, plus live paper-trade stats with manual trade validation and chart markers (BUY/SELL) for both manual and auto trades.
+- Manual trading flow: right-click to queue a buy/sell limit (`(P)` planned). Orders auto-activate once entry trades, and every trade marker carries a status suffix (`(T)` taken, `(W)` win, `(L)` loss, `(C)` canceled/breakeven). Planned trades can be canceled or manually closed early, and outcomes are persisted to `ict_trade_memory.json`.
 
 ## Next steps to harden
 - Draw true shaded zones for FVG/OB + session backgrounds.
 - Add paging/stitching for deeper history, plus caching.
-- Hook manual trade marking and R-multiple stats in backtest state.
-- Strengthen ICT heuristics (multi-timeframe bias, BOS/CHoCH checks) and parameter controls.
+- Surface live alert diagnostics in the UI (e.g., toast when alerts pause because a provider is stale).
+- Strengthen ICT heuristics (multi-timeframe bias, BOS/CHoCH checks) and parameter controls; add broker/webhook connectors once the alert feed is hardened.
