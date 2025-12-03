@@ -8078,5 +8078,117 @@
     "result": "loss",
     "rMultiple": 1,
     "timestamp": 1764111236558
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Asia",
+    "bias": "Neutral",
+    "result": "win",
+    "rMultiple": 1,
+    "timestamp": 1764174482228
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bearish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999887,
+    "timestamp": 1764605901868
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bearish",
+    "result": "win",
+    "rMultiple": 1.2500000000000167,
+    "timestamp": 1764607175966
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bearish",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1764608662688
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bearish",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1764608681576
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bearish",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1764608683121
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Neutral",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1764768922472
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bearish",
+    "result": "win",
+    "rMultiple": 1,
+    "timestamp": 1764769008447
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Neutral",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1764769183209
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bearish",
+    "result": "win",
+    "rMultiple": 1,
+    "timestamp": 1764769183214
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Neutral",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1764769196276
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bearish",
+    "result": "win",
+    "rMultiple": 1,
+    "timestamp": 1764769196280
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bearish",
+    "result": "win",
+    "rMultiple": 1,
+    "timestamp": 1764769202727
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Neutral",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1764769202731
   }
 ]
