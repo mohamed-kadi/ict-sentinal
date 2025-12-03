@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent } from "react";
 import clsx from "clsx";
 import type {
   IChartApi,
@@ -31,6 +30,7 @@ import {
 } from "@/lib/types";
 import { SESSION_ZONES } from "@/lib/config";
 import { classifySession } from "@/lib/ict";
+import { notifyAlertConnectors } from "@/lib/alertConnectors";
 import { CLOCK_OPTIONS, formatWithTz, getClockLabel } from "@/lib/time";
 import { evaluateIctScanner } from "@/lib/ictScanner";
 import { useAppStore, type BacktestState, type BacktestTrade } from "@/state/useAppStore";
@@ -50,6 +50,29 @@ const TIME_LABEL_FORMAT: Intl.DateTimeFormatOptions = {
   minute: "2-digit",
   second: "2-digit",
 };
+
+function timeframeToMs(tf?: Timeframe) {
+  switch (tf) {
+    case "1m":
+      return 60_000;
+    case "5m":
+      return 5 * 60_000;
+    case "15m":
+      return 15 * 60_000;
+    case "1h":
+      return 60 * 60_000;
+    case "4h":
+      return 4 * 60 * 60_000;
+    case "1D":
+      return 24 * 60 * 60_000;
+    case "1W":
+      return 7 * 24 * 60 * 60_000;
+    case "1M":
+      return 30 * 24 * 60 * 60_000;
+    default:
+      return 60 * 60_000;
+  }
+}
 
 type Props = {
   symbol?: string;
@@ -144,6 +167,8 @@ export function ChartPanel({
     trades,
     updateTrade,
     setBacktest: patchBacktest,
+    alertStatus,
+    setAlertStatus,
   } = useAppStore(
     useShallow((state) => ({
       drawingMode: state.drawingMode,
@@ -159,6 +184,8 @@ export function ChartPanel({
       trades: state.backtest.trades,
       updateTrade: state.updateTrade,
       setBacktest: state.setBacktest,
+      alertStatus: state.alertStatus,
+      setAlertStatus: state.setAlertStatus,
     })),
   );
   const candlesSnapshotRef = useRef(candles);
@@ -172,12 +199,17 @@ export function ChartPanel({
     formatWithTz(new Date(), clockTz, { weekday: "short", month: "short", day: "numeric" }),
   );
   const [timelineTicks, setTimelineTicks] = useState<{ label: string; position: number }[]>([]);
-  const [sessionBands, setSessionBands] = useState<
-    { id: string; left: number; width: number; label: string }[]
-  >([]);
-  const [killZoneBands, setKillZoneBands] = useState<
-    { id: string; left: number; width: number; label: string; color: string }[]
-  >([]);
+  type SessionShade = {
+    id: string;
+    left: number;
+    width: number;
+    label: string;
+    color: string;
+    gradient?: string;
+    textColor?: string;
+  };
+  const [sessionBands, setSessionBands] = useState<SessionShade[]>([]);
+  const [killZoneBands, setKillZoneBands] = useState<SessionShade[]>([]);
   const [fvgBoxes, setFvgBoxes] = useState<OverlayBox[]>([]);
   const [obBoxes, setObBoxes] = useState<OverlayBox[]>([]);
   const [breakerBoxes, setBreakerBoxes] = useState<OverlayBox[]>([]);
@@ -208,71 +240,27 @@ export function ChartPanel({
     lastSignalFeed && lastSignalFeed.length ? lastSignalFeed.at(-1)! : null;
   const backtestCandles = fullCandles && fullCandles.length ? fullCandles : candles;
   const datasetKey = `${symbol ?? "?"}-${timeframe ?? "?"}`;
+  const signalStorageKey = useMemo(() => `ict:last-signal:${datasetKey}`, [datasetKey]);
   const lastDatasetKeyRef = useRef(datasetKey);
   const lastCandleTimeRef = useRef<number | null>(candles.at(-1)?.t ?? null);
+  const timeframeMs = useMemo(() => timeframeToMs(timeframe), [timeframe]);
+  const staleSignalThreshold = useMemo(
+    () => Math.max(timeframeMs * 2, 15 * 60_000),
+    [timeframeMs],
+  );
+  const persistLastPromptedSignal = useCallback(
+    (timestamp: number | null) => {
+      lastPromptedSignalRef.current = timestamp;
+      if (typeof window === "undefined" || timestamp == null || !Number.isFinite(timestamp)) return;
+      try {
+        window.localStorage.setItem(signalStorageKey, String(timestamp));
+      } catch {
+        // ignore persistence errors
+      }
+    },
+    [signalStorageKey],
+  );
   const atrSeries = useMemo(() => computeAtrSeries(candles, 14), [candles]);
-  const [magnetVisible, setMagnetVisible] = useState(true);
-  const [magnetCollapsed, setMagnetCollapsed] = useState(false);
-  const [magnetExpanded, setMagnetExpanded] = useState(false);
-  const [magnetPos, setMagnetPos] = useState({ x: 24, y: 24 });
-  const dragState = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
-  const activeCandle = useMemo(() => {
-    if (backtest?.enabled) {
-      const idx = Math.min(Math.max(backtest.cursor, 0), Math.max(backtestCandles.length - 1, 0));
-      return backtestCandles[idx] ?? null;
-    }
-    return candles.at(-1) ?? null;
-  }, [backtest?.enabled, backtest?.cursor, backtestCandles, candles]);
-  const blueprintData = useMemo(() => {
-    if (!activeCandle) return null;
-    const range = Math.max(activeCandle.h - activeCandle.l, 1e-9);
-    const bodyHigh = Math.max(activeCandle.o, activeCandle.c);
-    const bodyLow = Math.min(activeCandle.o, activeCandle.c);
-    return {
-      wickTopPct: ((activeCandle.h - bodyHigh) / range) * 100,
-      bodyPct: ((bodyHigh - bodyLow) / range) * 100,
-      wickBottomPct: ((bodyLow - activeCandle.l) / range) * 100,
-      direction: activeCandle.c >= activeCandle.o ? 'up' : 'down',
-      range,
-    };
-  }, [activeCandle]);
-
-  const startMagnetDrag = (evt: ReactPointerEvent<HTMLDivElement>) => {
-    evt.preventDefault();
-    dragState.current = {
-      startX: evt.clientX,
-      startY: evt.clientY,
-      origX: magnetPos.x,
-      origY: magnetPos.y,
-    };
-    window.addEventListener('pointermove', handleMagnetDrag);
-    window.addEventListener('pointerup', stopMagnetDrag);
-  };
-
-  const handleMagnetDrag = useCallback((evt: PointerEvent) => {
-    if (!dragState.current) return;
-    const dx = evt.clientX - dragState.current.startX;
-    const dy = evt.clientY - dragState.current.startY;
-    const boundX = window.innerWidth - 120;
-    const boundY = window.innerHeight - 120;
-    setMagnetPos({
-      x: Math.min(Math.max(dragState.current.origX + dx, 8), boundX),
-      y: Math.min(Math.max(dragState.current.origY + dy, 8), boundY),
-    });
-  }, []);
-
-  const stopMagnetDrag = useCallback(() => {
-    dragState.current = null;
-    window.removeEventListener('pointermove', handleMagnetDrag);
-    window.removeEventListener('pointerup', stopMagnetDrag);
-  }, [handleMagnetDrag]);
-
-  useEffect(() => {
-    return () => {
-      window.removeEventListener('pointermove', handleMagnetDrag);
-      window.removeEventListener('pointerup', stopMagnetDrag);
-    };
-  }, [handleMagnetDrag, stopMagnetDrag]);
   const matchesSelectedSetup = useCallback(
     (setup?: string) => {
       if (!setup) return false;
@@ -580,35 +568,60 @@ export function ChartPanel({
   }, [drawingMode]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem(signalStorageKey);
+      const parsed = stored ? Number(stored) : null;
+      lastPromptedSignalRef.current = Number.isFinite(parsed) ? parsed : null;
+    } else {
+      lastPromptedSignalRef.current = null;
+    }
     if (lastDatasetKeyRef.current !== datasetKey) {
       lastDatasetKeyRef.current = datasetKey;
-      lastPromptedSignalRef.current = null;
       setSignalPrompt(null);
       setSignalPromptScore(null);
       seenSignalIdsRef.current.clear();
     }
-  }, [datasetKey]);
+  }, [datasetKey, signalStorageKey]);
 
   useEffect(() => {
-    if (notificationsEnabled && backtest?.enabled) {
-      console.warn(
-        "[ICT] Entry alerts follow the Backtest playback. Disable Backtest to receive live alerts.",
-      );
+    if (!notificationsEnabled) {
+      setAlertStatus(null);
+      return;
     }
-  }, [notificationsEnabled, backtest?.enabled]);
-
-  useEffect(() => {
-    if (!notificationsEnabled) return;
+    if (backtest?.enabled) {
+      setAlertStatus({
+        status: "paused",
+        message: "Alerts follow Backtest playback. Disable Backtest for live alerts.",
+        since: Date.now(),
+      });
+      return;
+    }
     const latestTime = candles.at(-1)?.t ?? null;
     const lastSignalTime = lastSignal?.time ?? null;
-    if (!latestTime || !lastSignalTime) return;
+    if (!latestTime || !lastSignalTime) {
+      setAlertStatus({
+        status: "stale",
+        message: "Awaiting first entry alert…",
+        since: Date.now(),
+      });
+      return;
+    }
     const ageHours = (latestTime - lastSignalTime) / (60 * 60 * 1000);
     if (ageHours >= 8) {
-      console.info(
-        `[ICT] No entry alerts detected in ${ageHours.toFixed(1)}h (last alert ${new Date(lastSignalTime).toISOString()}).`,
-      );
+      setAlertStatus({
+        status: "stale",
+        message: `No entry alerts in ${ageHours.toFixed(1)}h`,
+        detail: `Last alert ${new Date(lastSignalTime).toLocaleString()}`,
+        since: lastSignalTime,
+      });
+    } else {
+      setAlertStatus({
+        status: "live",
+        message: `Alerts live · last ${new Date(lastSignalTime).toLocaleTimeString()}`,
+        since: lastSignalTime,
+      });
     }
-  }, [notificationsEnabled, candles, lastSignal?.time]);
+  }, [notificationsEnabled, backtest?.enabled, candles, lastSignal?.time, setAlertStatus]);
 
   useEffect(() => {
     const next = new Set<string>();
@@ -1432,7 +1445,7 @@ export function ChartPanel({
       const usableWidth = chartWidth || (containerRef.current?.clientWidth ?? 600);
       const maxTicks = Math.max(2, Math.floor(usableWidth / 80));
       const step = Math.max(1, Math.floor(candles.length / maxTicks));
-      const ticks: { label: string; position: number }[] = [];
+        const ticks: { label: string; position: number }[] = [];
       const delta =
         candles.length > 1 ? Math.max(1, candles[1].t - candles[0].t) : 0;
 
@@ -1495,7 +1508,16 @@ export function ChartPanel({
         const left = mapCoord(r.start);
         const right = mapCoord(r.end);
         const width = Math.max(4, right - left);
-        return { id: `${r.label}-${idx}-${r.start}`, left, width, label: r.label, color: colorForKillzone(r.label) };
+        const sessionStyle = styleForSession(r.label);
+        return {
+          id: `${r.label}-${idx}-${r.start}`,
+          left,
+          width,
+          label: r.label,
+          color: sessionStyle.fill,
+          gradient: sessionStyle.gradient,
+          textColor: sessionStyle.text,
+        };
       })
       .filter((b) => Number.isFinite(b.left) && Number.isFinite(b.width));
     setSessionBands(bands);
@@ -1541,7 +1563,16 @@ export function ChartPanel({
         const left = mapCoord(r.start);
         const right = mapCoord(r.end);
         const width = Math.max(4, right - left);
-        return { id: `${r.label}-${idx}-${r.start}`, left, width, label: r.label, color: colorForKillzone(r.label) };
+        const color = colorForKillzone(r.label);
+        return {
+          id: `${r.label}-${idx}-${r.start}`,
+          left,
+          width,
+          label: r.label,
+          color,
+          gradient: `linear-gradient(180deg, ${color} 0%, rgba(0,0,0,0) 95%)`,
+          textColor: "#fefce8",
+        };
       })
       .filter((b) => Number.isFinite(b.left) && Number.isFinite(b.width));
     setKillZoneBands(bands);
@@ -1682,12 +1713,17 @@ export function ChartPanel({
         const extendedRight = lastVisibleX != null ? Math.max(baseRight, lastVisibleX) : baseRight + 60;
         const fill =
           g.type === "bullish"
-            ? "rgba(14,165,233,0.12)"
-            : "rgba(236,72,153,0.12)";
+            ? "rgba(14,165,233,0.18)"
+            : "rgba(236,72,153,0.18)";
+        const gradient =
+          g.type === "bullish"
+            ? "linear-gradient(180deg, rgba(14,165,233,0.22) 0%, rgba(14,165,233,0.02) 95%)"
+            : "linear-gradient(180deg, rgba(236,72,153,0.22) 0%, rgba(236,72,153,0.02) 95%)";
         const border =
           g.type === "bullish"
             ? "rgba(59,130,246,0.8)"
             : "rgba(244,114,182,0.8)";
+        const textColor = g.type === "bullish" ? "#bae6fd" : "#fecdd3";
         boxes.push({
           id: `fvg-${idx}-${g.startTime}`,
           left,
@@ -1696,6 +1732,8 @@ export function ChartPanel({
           height: Math.max(2, Math.abs(yTop - yBot)),
           color: fill,
           borderColor: border,
+          gradient,
+          textColor,
           label: `${g.type === "bullish" ? "Bull" : "Bear"} FVG`,
         });
       });
@@ -1715,8 +1753,13 @@ export function ChartPanel({
         const left = Math.min(x1, x2);
         const baseRight = Math.max(x1, x2);
         const extendedRight = lastVisibleX != null ? Math.max(baseRight, lastVisibleX) : baseRight + 60;
-        const fill = b.type === "bullish" ? "rgba(34,197,94,0.12)" : "rgba(248,113,113,0.12)";
+        const fill = b.type === "bullish" ? "rgba(34,197,94,0.16)" : "rgba(248,113,113,0.16)";
+        const gradient =
+          b.type === "bullish"
+            ? "linear-gradient(90deg, rgba(34,197,94,0.2) 0%, rgba(34,197,94,0.02) 90%)"
+            : "linear-gradient(90deg, rgba(248,113,113,0.2) 0%, rgba(248,113,113,0.02) 90%)";
         const border = b.type === "bullish" ? "rgba(52,211,153,0.8)" : "rgba(248,113,113,0.8)";
+        const textColor = "#fef3c7";
         boxes.push({
           id: `ob-${idx}-${b.startTime}`,
           left,
@@ -1725,6 +1768,8 @@ export function ChartPanel({
           height: Math.max(2, Math.abs(yTop - yBot)),
           color: fill,
           borderColor: border,
+           gradient,
+           textColor,
           label: `${b.type === "bullish" ? "Bull" : "Bear"} OB`,
         });
       });
@@ -1752,8 +1797,13 @@ export function ChartPanel({
               : "#fb7185";
         const fill =
           b.type === "bullish"
-            ? "rgba(59,130,246,0.12)"
-            : "rgba(192,38,211,0.12)";
+            ? "rgba(59,130,246,0.16)"
+            : "rgba(192,38,211,0.16)";
+        const gradient =
+          b.type === "bullish"
+            ? "linear-gradient(180deg, rgba(59,130,246,0.2) 0%, rgba(59,130,246,0.02) 100%)"
+            : "linear-gradient(180deg, rgba(192,38,211,0.2) 0%, rgba(192,38,211,0.02) 100%)";
+        const textColor = "#fef9c3";
         boxes.push({
           id: `breaker-${idx}-${b.startTime}`,
           left,
@@ -1762,6 +1812,8 @@ export function ChartPanel({
           height: Math.max(2, Math.abs(yTop - yBot)),
           color: fill,
           borderColor: gradeColor,
+          gradient,
+          textColor,
           label: `${b.type === "bullish" ? "Bull" : "Bear"} Breaker (${b.sourceObType} OB • ${b.grade ?? "weak"})`,
         });
       });
@@ -2001,6 +2053,7 @@ export function ChartPanel({
               color: s.direction === "buy" ? "#f97316" : "#ef4444",
               lineStyle: LineStyle.Solid,
               lineWidth: 1,
+              axisLabelVisible: false,
               title: `${s.setup ?? s.direction.toUpperCase()} SL ${idx + 1}`,
             }),
           );
@@ -2012,6 +2065,7 @@ export function ChartPanel({
               color: "#22c55e",
               lineStyle: LineStyle.Dotted,
               lineWidth: 1,
+              axisLabelVisible: false,
               title: `${s.setup ?? "TP"} 1`,
             }),
           );
@@ -2023,6 +2077,7 @@ export function ChartPanel({
               color: "#16a34a",
               lineStyle: LineStyle.Dotted,
               lineWidth: 1,
+              axisLabelVisible: false,
               title: `${s.setup ?? "TP"} 2`,
             }),
           );
@@ -2153,6 +2208,10 @@ export function ChartPanel({
     const latest = promptSignals.at(-1)!;
     const latestTime = candles.at(-1)?.t ?? latest.time;
     const isCurrent = latest.time === latestTime;
+    const signalAgeMs = latestTime ? Math.max(0, latestTime - latest.time) : 0;
+    const signalIsFresh = signalAgeMs <= staleSignalThreshold;
+    const isNewSignal =
+      lastPromptedSignalRef.current == null || latest.time > lastPromptedSignalRef.current;
     const showPrompt = () => {
       setSignalPrompt(latest);
       const evalResult = evaluateIctScanner({
@@ -2162,21 +2221,53 @@ export function ChartPanel({
         latestPrice: latestPrice ?? latest.price,
       });
       setSignalPromptScore(evalResult.score);
-      lastPromptedSignalRef.current = latest.time;
-      if (backtest?.autoTrade) {
+      persistLastPromptedSignal(latest.time);
+      const shouldNotify = !backtest?.enabled && signalIsFresh;
+      const shouldAutoTrade = Boolean(backtest?.autoTrade) && signalIsFresh;
+      if (shouldNotify) {
+        notifyAlertConnectors(latest, {
+          symbol,
+          timeframe,
+          bias,
+          price: latestPrice ?? latest.price,
+          session: latest.session ?? null,
+          source: dataSource,
+        });
+      }
+      if (shouldAutoTrade) {
         enterDemoTradeFromSignal(latest);
       }
     };
-    if (lastPromptedSignalRef.current == null) {
-      showPrompt();
-    } else if (latest.time > lastPromptedSignalRef.current) {
+    if (isNewSignal) {
+      if (!signalIsFresh && lastPromptedSignalRef.current == null) {
+        persistLastPromptedSignal(latest.time);
+        setSignalPrompt(null);
+        setSignalPromptScore(null);
+        return;
+      }
       showPrompt();
     } else if (backtest?.enabled && !isCurrent && signalPrompt && signalPrompt.time > latest.time) {
       // If stepping backward, restore previous prompt
       setSignalPrompt(latest);
       setSignalPromptScore(null);
     }
-  }, [promptSignals, notificationsEnabled, bias, premiumDiscount, latestPrice, candles, backtest?.enabled, backtest?.autoTrade, signalPrompt, enterDemoTradeFromSignal]);
+  }, [
+    promptSignals,
+    notificationsEnabled,
+    bias,
+    premiumDiscount,
+    latestPrice,
+    candles,
+    backtest?.enabled,
+    backtest?.autoTrade,
+    signalPrompt,
+    enterDemoTradeFromSignal,
+    symbol,
+    timeframe,
+    dataSource,
+    persistLastPromptedSignal,
+    staleSignalThreshold,
+  ]);
 
   useEffect(() => {
     if (!notificationsEnabled || !signalPrompt) return;
@@ -2295,10 +2386,17 @@ export function ChartPanel({
             {sessionBands.map((band) => (
               <div
                 key={band.id}
-                className="absolute top-0 bottom-0 bg-amber-500/10"
-                style={{ left: `${band.left}px`, width: `${band.width}px` }}
+                className="absolute top-0 bottom-0"
+                style={{
+                  left: `${band.left}px`,
+                  width: `${band.width}px`,
+                  background: band.gradient ?? band.color,
+                }}
               >
-                <div className="absolute left-1 top-1 rounded bg-black/60 px-1 py-0.5 text-[10px] text-amber-100">
+                <div
+                  className="absolute left-1 top-1 rounded bg-black/60 px-1 py-0.5 text-[10px]"
+                  style={{ color: band.textColor ?? "#fde68a" }}
+                >
                   {band.label}
                 </div>
               </div>
@@ -2311,104 +2409,21 @@ export function ChartPanel({
               <div
                 key={band.id}
                 className="absolute top-0 bottom-0"
-                style={{ left: `${band.left}px`, width: `${band.width}px`, backgroundColor: band.color }}
+                style={{
+                  left: `${band.left}px`,
+                  width: `${band.width}px`,
+                  background: band.gradient ?? band.color,
+                }}
               >
-                <div className="absolute left-1 top-1 rounded bg-black/60 px-1 py-0.5 text-[10px] text-white">
+                <div
+                  className="absolute left-1 top-1 rounded bg-black/60 px-1 py-0.5 text-[10px]"
+                  style={{ color: band.textColor ?? "#fefce8" }}
+                >
                   {band.label}
                 </div>
               </div>
             ))}
           </div>
-        )}
-        {magnetVisible && activeCandle && blueprintData && (
-          <div
-            className={`pointer-events-auto absolute z-40 rounded border border-emerald-500/40 bg-black/85 text-xs text-zinc-200 shadow-lg shadow-black/60 transition-all ${magnetExpanded ? 'h-80 w-80' : 'w-64'} ${magnetCollapsed ? 'h-10 overflow-hidden' : 'p-3'}`}
-            style={{ left: magnetPos.x, top: magnetPos.y }}
-          >
-            <div
-              className="mb-1 flex cursor-move items-center justify-between text-[11px] font-semibold"
-              onPointerDown={startMagnetDrag}
-            >
-              <span>Blueprint Magnet</span>
-              <div className="flex items-center gap-1 text-[10px]">
-                <span className="text-emerald-200">
-                  {formatWithTz(new Date(activeCandle.t), clockTz).split(', ').at(-1)}
-                </span>
-                <button
-                  className="rounded bg-zinc-800 px-1 text-white/80 hover:bg-zinc-700"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMagnetCollapsed((prev) => !prev);
-                  }}
-                >
-                  {magnetCollapsed ? '▢' : '—'}
-                </button>
-                <button
-                  className="rounded bg-zinc-800 px-1 text-white/80 hover:bg-zinc-700"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMagnetExpanded((prev) => !prev);
-                  }}
-                >
-                  {magnetExpanded ? '⤢' : '⤡'}
-                </button>
-                <button
-                  className="rounded bg-zinc-800 px-1 text-white/80 hover:bg-red-500"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMagnetVisible(false);
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-            {!magnetCollapsed && (
-              <div>
-                <div className={`flex items-center gap-3 ${magnetExpanded ? 'h-40' : ''}`}>
-                  <div className={`relative rounded bg-zinc-900 ${magnetExpanded ? 'h-28 w-10' : 'h-20 w-8'}`}>
-                    <div
-                      className="absolute left-[45%] w-[10%] rounded bg-zinc-200/70"
-                      style={{ top: 0, height: `${blueprintData.wickTopPct}%` }}
-                    />
-                    <div
-                      className={`absolute left-1 right-1 rounded ${blueprintData.direction === 'up' ? 'bg-emerald-400/70' : 'bg-rose-400/70'}`}
-                      style={{
-                        bottom: `${blueprintData.wickBottomPct}%`,
-                        height: `${blueprintData.bodyPct}%`,
-                      }}
-                    />
-                    <div
-                      className="absolute left-[45%] w-[10%] rounded bg-zinc-200/70"
-                      style={{ bottom: 0, height: `${blueprintData.wickBottomPct}%` }}
-                    />
-                  </div>
-                  <div className="flex-1 space-y-1 text-[11px]">
-                    <div className="flex justify-between"><span>Range</span><span>{Math.abs(blueprintData.range).toFixed(2)}</span></div>
-                    <div className="flex justify-between"><span>Open</span><span>{formatPrice(activeCandle.o)}</span></div>
-                    <div className="flex justify-between"><span>Close</span><span>{formatPrice(activeCandle.c)}</span></div>
-                    <div className="flex justify-between"><span>High</span><span>{formatPrice(activeCandle.h)}</span></div>
-                    <div className="flex justify-between"><span>Low</span><span>{formatPrice(activeCandle.l)}</span></div>
-                  </div>
-                </div>
-                <p className="mt-2 text-[10px] text-zinc-400">
-                  Drag this magnet anywhere. Use the buttons to minimize, expand, or close it. When we plug in the
-                  blueprint/order-book feed, it will snap here while keeping the main chart clean.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-        {!magnetVisible && (
-          <button
-            className="pointer-events-auto absolute bottom-4 right-4 z-40 rounded border border-emerald-500/40 bg-black/70 px-3 py-1 text-xs text-emerald-200"
-            onClick={() => {
-              setMagnetVisible(true);
-              setMagnetCollapsed(false);
-            }}
-          >
-            Show Blueprint Magnet
-          </button>
         )}
         {(dataSource || hoverCandle || backtest?.enabled || notificationsEnabled) && (
           <div className="pointer-events-none absolute left-2 top-2 z-30 space-y-1 text-[11px]">
@@ -2443,20 +2458,30 @@ export function ChartPanel({
               </div>
             )}
             {notificationsEnabled && (
-              <div className="rounded bg-emerald-900/60 px-2 py-1 text-[10px] text-emerald-100 shadow">
-                {lastSignal ? (
+              <div
+                className="rounded px-2 py-1 text-[10px] shadow"
+                style={{
+                  backgroundColor:
+                    alertStatus?.status === "live"
+                      ? "rgba(16,185,129,0.2)"
+                      : alertStatus?.status === "paused"
+                        ? "rgba(251,191,36,0.2)"
+                        : "rgba(248,113,113,0.2)",
+                  color:
+                    alertStatus?.status === "live"
+                      ? "#bbf7d0"
+                      : alertStatus?.status === "paused"
+                        ? "#fde68a"
+                        : "#fecaca",
+                }}
+              >
+                {alertStatus?.message ?? "Entry alerts enabled"}
+                {alertStatus?.detail ? (
                   <>
-                    Last alert · {formatWithTz(lastSignal.time, clockTz, TIME_LABEL_FORMAT)} ·{' '}
-                    {lastSignal.setup ?? lastSignal.direction.toUpperCase()}
+                    <br />
+                    <span className="text-[9px] opacity-80">{alertStatus.detail}</span>
                   </>
-                ) : (
-                  'Entry alerts enabled • awaiting setup'
-                )}
-              </div>
-            )}
-            {notificationsEnabled && backtest?.enabled && (
-              <div className="rounded bg-amber-900/70 px-2 py-1 text-[10px] text-amber-100 shadow">
-                Alerts follow backtest playback
+                ) : null}
               </div>
             )}
           </div>
@@ -2487,7 +2512,7 @@ export function ChartPanel({
           >
             <div className="text-[10px] uppercase tracking-wide text-emerald-300">Manual trade</div>
             <div className="mt-1 text-[11px] text-zinc-400">
-              {formatWithTz(manualTradePrompt.time, clockTz, TIME_LABEL_FORMAT)}
+            {formatWithTz(manualTradePrompt.time, clockTz, TIME_LABEL_FORMAT)}
             </div>
             <div className="text-base font-semibold text-white">
               {formatPrice(manualTradePrompt.price)}
@@ -2644,11 +2669,18 @@ export function ChartPanel({
                   width: `${box.width}px`,
                   top: `${box.top}px`,
                   height: `${box.height}px`,
-                  backgroundColor: box.color,
+                  background: box.gradient ?? box.color,
                   borderColor: box.borderColor ?? box.color,
                 }}
                 title={box.label}
-              />
+              >
+                <div
+                  className="absolute left-1 top-1 rounded px-1 py-0.5 text-[10px]"
+                  style={{ backgroundColor: "rgba(0,0,0,0.45)", color: box.textColor ?? "#e2e8f0" }}
+                >
+                  {box.label}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -2663,11 +2695,18 @@ export function ChartPanel({
                   width: `${box.width}px`,
                   top: `${box.top}px`,
                   height: `${box.height}px`,
-                  backgroundColor: box.color,
+                  background: box.gradient ?? box.color,
                   borderColor: box.borderColor ?? box.color,
                 }}
                 title={box.label}
-              />
+              >
+                <div
+                  className="absolute left-1 top-1 rounded px-1 py-0.5 text-[10px]"
+                  style={{ backgroundColor: "rgba(0,0,0,0.45)", color: box.textColor ?? "#fefce8" }}
+                >
+                  {box.label}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -2682,11 +2721,18 @@ export function ChartPanel({
                   width: `${box.width}px`,
                   top: `${box.top}px`,
                   height: `${box.height}px`,
-                  backgroundColor: box.color,
+                  background: box.gradient ?? box.color,
                   borderColor: box.borderColor ?? box.color,
                 }}
                 title={box.label}
-              />
+              >
+                <div
+                  className="absolute left-1 top-1 rounded px-1 py-0.5 text-[10px]"
+                  style={{ backgroundColor: "rgba(0,0,0,0.45)", color: box.textColor ?? "#fde68a" }}
+                >
+                  {box.label}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -3060,6 +3106,36 @@ function colorForKillzone(label: string) {
   return "rgba(255,255,255,0.04)";
 }
 
+function styleForSession(label: string) {
+  const lc = label?.toLowerCase() ?? "";
+  if (lc.includes("asia")) {
+    return {
+      fill: "rgba(59,130,246,0.16)",
+      gradient: "linear-gradient(180deg, rgba(59,130,246,0.18) 0%, rgba(15,23,42,0) 100%)",
+      text: "#bfdbfe",
+    };
+  }
+  if (lc.includes("london")) {
+    return {
+      fill: "rgba(45,212,191,0.16)",
+      gradient: "linear-gradient(180deg, rgba(45,212,191,0.18) 0%, rgba(6,78,59,0) 100%)",
+      text: "#d1fae5",
+    };
+  }
+  if (lc.includes("new york") || lc.includes("ny")) {
+    return {
+      fill: "rgba(249,115,22,0.16)",
+      gradient: "linear-gradient(180deg, rgba(249,115,22,0.2) 0%, rgba(120,53,15,0) 100%)",
+      text: "#ffedd5",
+    };
+  }
+  return {
+    fill: "rgba(148,163,184,0.12)",
+    gradient: "linear-gradient(180deg, rgba(148,163,184,0.16) 0%, rgba(30,41,59,0) 100%)",
+    text: "#e2e8f0",
+  };
+}
+
 type OverlayBox = {
   id: string;
   left: number;
@@ -3068,6 +3144,8 @@ type OverlayBox = {
   height: number;
   color: string;
   borderColor?: string;
+  gradient?: string;
+  textColor?: string;
   label: string;
 };
 

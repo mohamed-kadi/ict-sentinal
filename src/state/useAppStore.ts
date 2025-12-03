@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { AssetClass, Timeframe, Drawing, DrawingType, Bias } from '@/lib/types';
 
 type OverlayKey =
@@ -82,91 +83,124 @@ type AppState = {
   setAllOverlays: (value: boolean) => void;
   toggleNotifications: () => void;
   toggleOptimizer: () => void;
+  alertStatus: AlertDiagnostics | null;
+  setAlertStatus: (status: AlertDiagnostics | null) => void;
   updateTrade: (id: string, patch: Partial<BacktestTrade>) => void;
 };
 
-export const useAppStore = create<AppState>((set) => ({
-  assetClass: 'crypto',
-  symbol: 'BTCUSDT',
-  timeframe: '1h',
-  overlays: {
-    liquidity: true,
-    fvg: true,
-    orderBlocks: true,
-    sessions: true,
-    killzones: false,
-    signals: true,
-    sweeps: true,
-    breakers: false,
-    oteBands: true,
-    inversionFvgSignals: true,
-    tradeMarkers: true,
-  },
-  selectedSetup: 'all',
-  backtest: { enabled: false, playing: false, speed: 1, cursor: 0, trades: [], balance: 0, autoTrade: false },
-  sidebarOpen: true,
-  drawingMode: 'none',
-  drawings: [],
-  clockTz: 'America/New_York',
-  notificationsEnabled: true,
-  optimizerEnabled: true,
-  setAssetClass: (assetClass) => set({ assetClass }),
-  setSymbol: (symbol) => set({ symbol }),
-  setTimeframe: (timeframe) => set({ timeframe }),
-  toggleOverlay: (key) =>
-    set((state) => ({
-      overlays: { ...state.overlays, [key]: !state.overlays[key] },
-    })),
-  setBacktest: (patch) =>
-    set((state) => ({
-      backtest: { ...state.backtest, ...patch },
-    })),
-  addTrade: (trade) =>
-    set((state) => ({
-      backtest: { ...state.backtest, trades: [...state.backtest.trades, trade] },
-    })),
-  clearTrades: () =>
-    set((state) => ({
-      backtest: { ...state.backtest, trades: [], balance: 0 },
-    })),
-  updateTrade: (id, patch) =>
-    set((state) => ({
-      backtest: {
-        ...state.backtest,
-        trades: state.backtest.trades.map((trade) =>
-          trade.id === id ? { ...trade, ...patch } : trade,
-        ),
-        balance:
-          patch.pnl != null
-            ? state.backtest.balance + patch.pnl
-            : state.backtest.balance,
+export type AlertDiagnostics = {
+  status: 'live' | 'paused' | 'stale';
+  message: string;
+  detail?: string;
+  since: number;
+};
+
+export const useAppStore = create<AppState>()(
+  persist(
+    (set) => ({
+      assetClass: 'crypto',
+      symbol: 'BTCUSDT',
+      timeframe: '1h',
+      overlays: {
+        liquidity: true,
+        fvg: true,
+        orderBlocks: true,
+        sessions: true,
+        killzones: false,
+        signals: true,
+        sweeps: true,
+        breakers: false,
+        oteBands: true,
+        inversionFvgSignals: true,
+        tradeMarkers: true,
       },
-    })),
-  setSelectedSetup: (selectedSetup) => set({ selectedSetup }),
-  toggleSidebar: () =>
-    set((state) => ({
-      sidebarOpen: !state.sidebarOpen,
-    })),
-  setDrawingMode: (mode) => set({ drawingMode: mode }),
-  addDrawing: (drawing) =>
-    set((state) => ({
-      drawings: [...state.drawings, drawing],
-    })),
-  clearDrawings: () => set({ drawings: [] }),
-  setClockTz: (clockTz) => set({ clockTz }),
-  setAllOverlays: (value) =>
-    set((state) => ({
-      overlays: Object.fromEntries(Object.keys(state.overlays).map((key) => [key, value])) as Record<
-        OverlayKey,
-        boolean
-      >,
-    })),
-  toggleNotifications: () =>
-    set((state) => ({
-      notificationsEnabled: !state.notificationsEnabled,
-    })),
-  toggleOptimizer: () =>
-    set((state) => ({
-      optimizerEnabled: !state.optimizerEnabled,
-    })),
-}));
+      selectedSetup: 'all',
+      backtest: { enabled: false, playing: false, speed: 1, cursor: 0, trades: [], balance: 0, autoTrade: false },
+      sidebarOpen: true,
+      drawingMode: 'none',
+      drawings: [],
+      clockTz: 'America/New_York',
+      notificationsEnabled: true,
+      optimizerEnabled: true,
+      alertStatus: null,
+      setAssetClass: (assetClass) => set({ assetClass }),
+      setSymbol: (symbol) => set({ symbol }),
+      setTimeframe: (timeframe) => set({ timeframe }),
+      toggleOverlay: (key) =>
+        set((state) => ({
+          overlays: { ...state.overlays, [key]: !state.overlays[key] },
+        })),
+      setBacktest: (patch) =>
+        set((state) => ({
+          backtest: { ...state.backtest, ...patch },
+        })),
+      addTrade: (trade) =>
+        set((state) => ({
+          backtest: { ...state.backtest, trades: [...state.backtest.trades, trade] },
+        })),
+      clearTrades: () =>
+        set((state) => ({
+          backtest: { ...state.backtest, trades: [], balance: 0 },
+        })),
+      updateTrade: (id, patch) =>
+        set((state) => ({
+          backtest: {
+            ...state.backtest,
+            trades: state.backtest.trades.map((trade) =>
+              trade.id === id ? { ...trade, ...patch } : trade,
+            ),
+            balance:
+              patch.pnl != null
+                ? state.backtest.balance + patch.pnl
+                : state.backtest.balance,
+          },
+        })),
+      setSelectedSetup: (selectedSetup) => set({ selectedSetup }),
+      toggleSidebar: () =>
+        set((state) => ({
+          sidebarOpen: !state.sidebarOpen,
+        })),
+      setDrawingMode: (mode) => set({ drawingMode: mode }),
+      addDrawing: (drawing) =>
+        set((state) => ({
+          drawings: [...state.drawings, drawing],
+        })),
+      clearDrawings: () => set({ drawings: [] }),
+      setClockTz: (clockTz) => set({ clockTz }),
+      setAllOverlays: (value) =>
+        set((state) => ({
+          overlays: Object.fromEntries(Object.keys(state.overlays).map((key) => [key, value])) as Record<
+            OverlayKey,
+            boolean
+          >,
+        })),
+      toggleNotifications: () =>
+        set((state) => ({
+          notificationsEnabled: !state.notificationsEnabled,
+          alertStatus: state.notificationsEnabled ? null : state.alertStatus,
+        })),
+      toggleOptimizer: () =>
+        set((state) => ({
+          optimizerEnabled: !state.optimizerEnabled,
+        })),
+      setAlertStatus: (alertStatus) => set({ alertStatus }),
+    }),
+    {
+      name: 'ict-app-store',
+      partialize: (state) => ({
+        assetClass: state.assetClass,
+        symbol: state.symbol,
+        timeframe: state.timeframe,
+        overlays: state.overlays,
+        selectedSetup: state.selectedSetup,
+        backtest: state.backtest,
+        sidebarOpen: state.sidebarOpen,
+        drawingMode: state.drawingMode,
+        drawings: state.drawings,
+        clockTz: state.clockTz,
+        notificationsEnabled: state.notificationsEnabled,
+        optimizerEnabled: state.optimizerEnabled,
+      }),
+    },
+  ),
+);
