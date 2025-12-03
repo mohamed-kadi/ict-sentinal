@@ -2015,10 +2015,17 @@ export function classifySession(date: Date, sessions: SessionZone[]): SessionZon
   return sessions.find((s) => hour >= s.startHour && hour < s.endHour) ?? null;
 }
 
+type StructureShiftOptions = {
+  minSwingDistance?: number;
+  minSpacingBars?: number;
+  minBreakPct?: number;
+};
+
 export function detectStructureShifts(
   candles: Candle[],
   swings: Swing[],
   displacementAtr = 0,
+  options?: StructureShiftOptions,
 ): StructureShift[] {
   if (candles.length === 0 || swings.length < 2) return [];
   const shifts: StructureShift[] = [];
@@ -2028,16 +2035,23 @@ export function detectStructureShifts(
   let highIdx = -1;
   let lowIdx = -1;
   let state: 'bullish' | 'bearish' | null = null;
+  let lastShiftBar = -Infinity;
+  const minSwingDistance = options?.minSwingDistance ?? 1;
+  const minSpacingBars = options?.minSpacingBars ?? 3;
+  const minBreakPct = options?.minBreakPct ?? 0.00008;
 
   const hasDisplacement = (candle: Candle, level: number, dir: 'up' | 'down') => {
-    const atrThreshold = displacementAtr > 0 ? displacementAtr * 0.5 : null;
-    const defaultRange = (candle.h - candle.l || 1) * 0.2;
-    const threshold = atrThreshold ?? defaultRange;
-    if (dir === 'up') return candle.c > level && candle.c - level > threshold;
-    return candle.c < level && level - candle.c > threshold;
+    const range = candle.h - candle.l || Math.abs(candle.c - candle.o) || 1;
+    const atrThreshold = displacementAtr > 0 ? displacementAtr * 0.4 : range * 0.35;
+    const buffer = Math.max(level * minBreakPct, atrThreshold * 0.1);
+    if (dir === 'up') {
+      return candle.h > level + buffer && candle.c > level + atrThreshold * 0.25;
+    }
+    return candle.l < level - buffer && candle.c < level - atrThreshold * 0.25;
   };
 
-  for (const candle of candles) {
+  for (let bar = 0; bar < candles.length; bar++) {
+    const candle = candles[bar];
     while (highIdx + 1 < highSwings.length && highSwings[highIdx + 1].time <= candle.t) {
       highIdx++;
     }
@@ -2046,10 +2060,15 @@ export function detectStructureShifts(
     }
     const activeHigh = highIdx >= 0 ? highSwings[highIdx] : null;
     const activeLow = lowIdx >= 0 ? lowSwings[lowIdx] : null;
-    const brokeHigh = activeHigh ? hasDisplacement(candle, activeHigh.price, 'up') : false;
-    const brokeLow = activeLow ? hasDisplacement(candle, activeLow.price, 'down') : false;
+    const highSpacingOk =
+      activeHigh?.index != null ? bar - activeHigh.index >= minSwingDistance : true;
+    const lowSpacingOk =
+      activeLow?.index != null ? bar - activeLow.index >= minSwingDistance : true;
+    const brokeHigh = activeHigh && highSpacingOk ? hasDisplacement(candle, activeHigh.price, 'up') : false;
+    const brokeLow = activeLow && lowSpacingOk ? hasDisplacement(candle, activeLow.price, 'down') : false;
 
     if (brokeHigh && state !== 'bullish' && activeHigh) {
+      if (bar - lastShiftBar < minSpacingBars) continue;
       shifts.push({
         time: candle.t,
         price: activeHigh.price,
@@ -2057,7 +2076,9 @@ export function detectStructureShifts(
         label: state === 'bearish' ? 'CHoCH' : 'BOS',
       });
       state = 'bullish';
+      lastShiftBar = bar;
     } else if (brokeLow && state !== 'bearish' && activeLow) {
+      if (bar - lastShiftBar < minSpacingBars) continue;
       shifts.push({
         time: candle.t,
         price: activeLow.price,
@@ -2065,6 +2086,7 @@ export function detectStructureShifts(
         label: state === 'bullish' ? 'CHoCH' : 'BOS',
       });
       state = 'bearish';
+      lastShiftBar = bar;
     }
   }
 

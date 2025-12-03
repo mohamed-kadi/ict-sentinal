@@ -39,9 +39,15 @@ export function Dashboard() {
     sidebarOpen,
     toggleSidebar,
   } = useAppStore();
-  const { data: candleRes, isLoading, error } = useCandles(assetClass, symbol, timeframe);
-  const candles = candleRes?.candles ?? EMPTY_CANDLES;
-  const source = candleRes?.source;
+  const {
+    candles = EMPTY_CANDLES,
+    source,
+    isLoading,
+    error,
+    fetchOlder,
+    hasMore,
+    isFetchingOlder,
+  } = useCandles(assetClass, symbol, timeframe);
 
   useEffect(() => {
     if (!backtest.enabled) return;
@@ -67,9 +73,16 @@ export function Dashboard() {
     () => (overlays.orderBlocks ? detectOrderBlocks(scopedCandles) : []),
     [scopedCandles, overlays.orderBlocks],
   );
+  const structureShiftOptions = useMemo(
+    () => ({ minSwingDistance: 2, minSpacingBars: 4, minBreakPct: 0.00005 }),
+    [],
+  );
   const structureShifts = useMemo(
-    () => (overlays.liquidity ? detectStructureShifts(scopedCandles, swings) : []),
-    [scopedCandles, swings, overlays.liquidity],
+    () =>
+      overlays.liquidity
+        ? detectStructureShifts(scopedCandles, swings, 0, structureShiftOptions)
+        : [],
+    [scopedCandles, swings, overlays.liquidity, structureShiftOptions],
   );
   const sweeps = useMemo(
     () => (overlays.sweeps ? detectLiquiditySweeps(scopedCandles) : []),
@@ -227,6 +240,18 @@ export function Dashboard() {
           )}
           {!isLoading && !error && (
             <>
+              {hasMore && (
+                <div className="flex justify-end px-4 pb-2 text-xs text-zinc-300">
+                  <button
+                    type="button"
+                    className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1 font-semibold text-emerald-200 transition hover:border-emerald-500 disabled:opacity-60"
+                    onClick={() => fetchOlder()}
+                    disabled={isFetchingOlder}
+                  >
+                    {isFetchingOlder ? 'Loading older data…' : 'Load older history'}
+                  </button>
+                </div>
+              )}
               <div className="flex flex-1 min-h-0">
                 <div className="flex-1 min-h-0">
                   <ChartPanel
