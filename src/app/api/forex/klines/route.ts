@@ -20,18 +20,47 @@ const ALPHA_INTERVALS: Record<string, string> = {
   '1h': '60min',
 };
 
+const BINANCE_INTERVALS: Record<string, string> = {
+  '1m': '1m',
+  '5m': '5m',
+  '15m': '15m',
+  '1h': '1h',
+  '4h': '4h',
+  '1D': '1d',
+  '1W': '1w',
+  '1M': '1M',
+};
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const symbol = normalizeSymbol(searchParams.get('symbol') || 'EURUSD');
   const interval = searchParams.get('interval') ?? '1h';
   const limit = clamp(Number(searchParams.get('limit')) || 500, 50, 5000);
+  const endTimeParam = searchParams.get('endTime');
+  const before = endTimeParam ? Number(endTimeParam) : null;
 
   try {
+    if (symbol === 'XAUUSD') {
+      try {
+        const data = await fetchBinanceXau(symbol, interval, limit);
+        return NextResponse.json({
+          ...data,
+          candles: applyWindow(data.candles, before, limit),
+          source: 'binance_paxg',
+        });
+      } catch (err) {
+        // continue to next provider
+      }
+    }
     // prefer TwelveData if available
     if (process.env.TWELVE_DATA_KEY) {
       try {
         const data = await fetchTwelveData(symbol, interval, limit, process.env.TWELVE_DATA_KEY);
-        return NextResponse.json({ ...data, source: 'twelvedata' });
+        return NextResponse.json({
+          ...data,
+          candles: applyWindow(data.candles, before, limit),
+          source: 'twelvedata',
+        });
       } catch (err) {
         // continue to next provider
       }
@@ -39,7 +68,11 @@ export async function GET(request: NextRequest) {
     if (process.env.ALPHA_VANTAGE_KEY) {
       try {
         const data = await fetchAlphaVantage(symbol, interval, limit, process.env.ALPHA_VANTAGE_KEY);
-        return NextResponse.json({ ...data, source: 'alpha_vantage' });
+        return NextResponse.json({
+          ...data,
+          candles: applyWindow(data.candles, before, limit),
+          source: 'alpha_vantage',
+        });
       } catch (err) {
         // continue to fallback
       }
@@ -47,15 +80,20 @@ export async function GET(request: NextRequest) {
     // fallback to Yahoo Finance (no key required)
     try {
       const yahoo = await fetchYahoo(symbol, interval, limit);
-      return NextResponse.json({ ...yahoo, source: 'yahoo' });
+      return NextResponse.json({
+        ...yahoo,
+        candles: applyWindow(yahoo.candles, before, limit),
+        source: 'yahoo',
+      });
     } catch (err) {
       // final fallback: synthetic candles so UI stays alive
       const candles = generateMockCandles(symbol, interval, limit);
       return NextResponse.json({
         symbol,
         interval,
-        candles,
+        candles: applyWindow(candles, before, limit),
         source: 'mock',
+        timezone: 'UTC',
         warning:
           'Live providers failed; showing mock data. Check TWELVE_DATA_KEY/ALPHA_VANTAGE_KEY or try a different interval/symbol.',
         detail: String(err),
@@ -68,7 +106,8 @@ export async function GET(request: NextRequest) {
       {
         symbol,
         interval,
-        candles,
+        candles: applyWindow(candles, before, limit),
+        timezone: 'UTC',
         warning:
           'Live providers failed; showing mock data. Check TWELVE_DATA_KEY/ALPHA_VANTAGE_KEY or try a different interval/symbol.',
         detail: String(error),
@@ -101,7 +140,7 @@ async function fetchTwelveData(symbol: string, interval: string, limit: number, 
     c: Number(v.close),
     v: Number(v.volume ?? 0),
   }));
-  return { symbol, interval, candles };
+  return { symbol, interval, candles, timezone };
 }
 
 async function resolveTwelveSymbol(symbol: string, key: string) {
@@ -146,13 +185,39 @@ async function fetchAlphaVantage(symbol: string, interval: string, limit: number
     }))
     .sort((a, b) => a.t - b.t)
     .slice(-limit);
-  return { symbol, interval, candles: entries };
+  return { symbol, interval, candles: entries, timezone };
 }
 
 function normalizeSymbol(symbol: string) {
   const clean = symbol.replace('/', '').toUpperCase();
   if (clean.length === 6) return clean;
   return clean;
+}
+
+async function fetchBinanceXau(symbol: string, interval: string, limit: number) {
+  const binanceInterval = BINANCE_INTERVALS[interval];
+  if (!binanceInterval) throw new Error('Unsupported interval for Binance XAU');
+  const url = new URL('https://api.binance.com/api/v3/klines');
+  url.searchParams.set('symbol', 'PAXGUSDT'); // PAX Gold spot maps closely to XAUUSD
+  url.searchParams.set('interval', binanceInterval);
+  url.searchParams.set('limit', String(clamp(limit, 10, 1000)));
+
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Binance XAU error ${res.status}`);
+  const raw = await res.json();
+  const candles = (raw as any[]).map((entry: any) => {
+    const [openTime, open, high, low, close, volume] = entry;
+    return {
+      t: Number(openTime),
+      o: Number(open),
+      h: Number(high),
+      l: Number(low),
+      c: Number(close),
+      v: Number(volume),
+    };
+  });
+  if (!candles.length) throw new Error('Binance XAU returned no candles');
+  return { symbol, interval, candles, timezone: 'UTC' };
 }
 
 async function fetchYahoo(symbol: string, interval: string, limit: number) {
@@ -172,6 +237,7 @@ async function fetchYahoo(symbol: string, interval: string, limit: number) {
     throw new Error('Yahoo missing data');
   }
   const quotes = result.indicators.quote[0];
+  const timezone = result.meta?.timezone ?? 'UTC';
   const candles: { t: number; o: number; h: number; l: number; c: number; v: number }[] = [];
   for (let idx = 0; idx < result.timestamp.length; idx++) {
     const t = result.timestamp[idx];
@@ -185,7 +251,7 @@ async function fetchYahoo(symbol: string, interval: string, limit: number) {
     }
   }
   if (candles.length === 0) throw new Error('Yahoo returned no finite candles');
-  return { symbol, interval, candles: candles.slice(-limit) };
+  return { symbol, interval, candles: candles.slice(-limit), timezone };
 }
 
 function mapYahooInterval(interval: string) {
@@ -269,6 +335,14 @@ function yahooRangeFromInterval(interval: string, limit: number) {
   if (interval === '1D' || interval === '1W') return '1y';
   if (interval === '1M') return '2y';
   return '6mo';
+}
+
+function applyWindow<T extends { t: number }>(candles: T[], before: number | null, limit: number): T[] {
+  let filtered = candles;
+  if (before && Number.isFinite(before)) {
+    filtered = filtered.filter((c) => c.t < before);
+  }
+  return filtered.slice(-limit);
 }
 
 function generateMockCandles(symbol: string, interval: string, limit: number) {

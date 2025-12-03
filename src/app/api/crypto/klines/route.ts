@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       c: Number(candle[4]),
       v: Number(candle[5]),
     }));
-    return NextResponse.json({ symbol, interval, candles });
+    return NextResponse.json({ symbol, interval, candles, timezone: 'UTC' });
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to reach Binance', detail: String(error) },
