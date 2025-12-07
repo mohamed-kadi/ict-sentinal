@@ -8190,5 +8190,4341 @@
     "result": "loss",
     "rMultiple": 1,
     "timestamp": 1764769202731
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Neutral",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1765025034669
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bearish",
+    "result": "win",
+    "rMultiple": 1,
+    "timestamp": 1765025034674
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Neutral",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1765025180743
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bearish",
+    "result": "win",
+    "rMultiple": 1,
+    "timestamp": 1765025180747
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Neutral",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1765032257243
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bearish",
+    "result": "win",
+    "rMultiple": 1,
+    "timestamp": 1765032257250
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Neutral",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1765032274805
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bearish",
+    "result": "win",
+    "rMultiple": 1,
+    "timestamp": 1765032274809
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Neutral",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1765032397096
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bearish",
+    "result": "win",
+    "rMultiple": 1,
+    "timestamp": 1765032397103
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bearish",
+    "result": "loss",
+    "rMultiple": 0.10680058669139557,
+    "timestamp": 1765039159003
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1765039384106
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Neutral",
+    "result": "win",
+    "rMultiple": 1,
+    "timestamp": 1765039478129
+  },
+  {
+    "setup": "Manual Entry",
+    "session": "Manual",
+    "bias": "Neutral",
+    "result": "win",
+    "rMultiple": 2,
+    "timestamp": 1765039542979
+  },
+  {
+    "setup": "Manual Entry",
+    "session": "Manual",
+    "bias": "Neutral",
+    "result": "win",
+    "rMultiple": 5.666666666666667,
+    "timestamp": 1765039634639
+  },
+  {
+    "setup": "Manual Entry",
+    "session": "Manual",
+    "bias": "Neutral",
+    "result": "win",
+    "rMultiple": 5.666666666666667,
+    "timestamp": 1765040866561
+  },
+  {
+    "setup": "Manual Entry",
+    "session": "Manual",
+    "bias": "Neutral",
+    "result": "win",
+    "rMultiple": 5.666666666666667,
+    "timestamp": 1765040882952
+  },
+  {
+    "setup": "Manual Entry",
+    "session": "Manual",
+    "bias": "Neutral",
+    "result": "win",
+    "rMultiple": 5.666666666666667,
+    "timestamp": 1765040976640
+  },
+  {
+    "setup": "Manual Entry",
+    "session": "Manual",
+    "bias": "Neutral",
+    "result": "win",
+    "rMultiple": 5.666666666666667,
+    "timestamp": 1765047518859
+  },
+  {
+    "setup": "Manual Entry",
+    "session": "Manual",
+    "bias": "Neutral",
+    "result": "win",
+    "rMultiple": 5.666666666666667,
+    "timestamp": 1765047620852
+  },
+  {
+    "setup": "Manual Entry",
+    "session": "Manual",
+    "bias": "Neutral",
+    "result": "win",
+    "rMultiple": 5.666666666666667,
+    "timestamp": 1765060347370
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000162,
+    "timestamp": 1765126742857
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000018,
+    "timestamp": 1765126742862
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.250000000000007,
+    "timestamp": 1765126742865
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000029,
+    "timestamp": 1765126742869
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999787,
+    "timestamp": 1765126742874
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999845,
+    "timestamp": 1765126742879
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126742893
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999767,
+    "timestamp": 1765126742901
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999962,
+    "timestamp": 1765126742904
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000062,
+    "timestamp": 1765126742910
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126742917
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126742930
+  },
+  {
+    "setup": "Trend Pullback",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999556,
+    "timestamp": 1765126742936
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000444,
+    "timestamp": 1765126742940
+  },
+  {
+    "setup": "Power of Three Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126742943
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999736,
+    "timestamp": 1765126742947
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126742952
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000286,
+    "timestamp": 1765126742956
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126742962
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999873,
+    "timestamp": 1765126742965
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.249999999999959,
+    "timestamp": 1765126742968
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126742971
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126742975
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999813,
+    "timestamp": 1765126742981
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999902,
+    "timestamp": 1765126742987
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000202,
+    "timestamp": 1765126742991
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000193,
+    "timestamp": 1765126742995
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999947,
+    "timestamp": 1765126743000
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000318,
+    "timestamp": 1765126743003
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000129,
+    "timestamp": 1765126743009
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126743014
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999571,
+    "timestamp": 1765126743017
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999911,
+    "timestamp": 1765126743020
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999825,
+    "timestamp": 1765126743024
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000118,
+    "timestamp": 1765126743028
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.250000000000013,
+    "timestamp": 1765126743031
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999822,
+    "timestamp": 1765126743037
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000244,
+    "timestamp": 1765126743042
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.0790348828983534,
+    "timestamp": 1765126743046
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126743050
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.25,
+    "timestamp": 1765126743053
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.1640274203306418,
+    "timestamp": 1765126743056
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000597,
+    "timestamp": 1765126743063
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126743067
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999547,
+    "timestamp": 1765126743073
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6713111112159879,
+    "timestamp": 1765126743077
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126743080
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999207,
+    "timestamp": 1765126743084
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6943521279224725,
+    "timestamp": 1765126743087
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126743091
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999787,
+    "timestamp": 1765126747394
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.250000000000007,
+    "timestamp": 1765126747397
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000029,
+    "timestamp": 1765126747406
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000018,
+    "timestamp": 1765126747411
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000162,
+    "timestamp": 1765126747414
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999845,
+    "timestamp": 1765126747418
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126747425
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999767,
+    "timestamp": 1765126747430
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999962,
+    "timestamp": 1765126747436
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000062,
+    "timestamp": 1765126747438
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126747442
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126747446
+  },
+  {
+    "setup": "Trend Pullback",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999556,
+    "timestamp": 1765126747451
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000444,
+    "timestamp": 1765126747455
+  },
+  {
+    "setup": "Power of Three Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126747459
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999736,
+    "timestamp": 1765126747462
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126747479
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000286,
+    "timestamp": 1765126747508
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999813,
+    "timestamp": 1765126747563
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126747571
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126747578
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999873,
+    "timestamp": 1765126747583
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.249999999999959,
+    "timestamp": 1765126747594
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126747612
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999902,
+    "timestamp": 1765126747617
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000202,
+    "timestamp": 1765126747620
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000193,
+    "timestamp": 1765126747622
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999947,
+    "timestamp": 1765126747625
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000318,
+    "timestamp": 1765126747628
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000129,
+    "timestamp": 1765126747632
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999911,
+    "timestamp": 1765126747636
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126747639
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999571,
+    "timestamp": 1765126747643
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999825,
+    "timestamp": 1765126747645
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000118,
+    "timestamp": 1765126747649
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.250000000000013,
+    "timestamp": 1765126747652
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999822,
+    "timestamp": 1765126747657
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000244,
+    "timestamp": 1765126747662
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.0790348828983534,
+    "timestamp": 1765126747665
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126747669
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.25,
+    "timestamp": 1765126747672
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.1640274203306418,
+    "timestamp": 1765126747677
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000597,
+    "timestamp": 1765126747681
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126747684
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999547,
+    "timestamp": 1765126747688
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6713111112159879,
+    "timestamp": 1765126747691
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126747694
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999207,
+    "timestamp": 1765126747697
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6943521279224725,
+    "timestamp": 1765126747701
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126747704
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999787,
+    "timestamp": 1765126748053
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.250000000000007,
+    "timestamp": 1765126748056
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000029,
+    "timestamp": 1765126748060
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000018,
+    "timestamp": 1765126748063
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000162,
+    "timestamp": 1765126748066
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999845,
+    "timestamp": 1765126748071
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748080
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999767,
+    "timestamp": 1765126748083
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999962,
+    "timestamp": 1765126748086
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000062,
+    "timestamp": 1765126748092
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748095
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748097
+  },
+  {
+    "setup": "Trend Pullback",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999556,
+    "timestamp": 1765126748110
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000444,
+    "timestamp": 1765126748113
+  },
+  {
+    "setup": "Power of Three Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748116
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999736,
+    "timestamp": 1765126748119
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748122
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000286,
+    "timestamp": 1765126748126
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748132
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999873,
+    "timestamp": 1765126748135
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.249999999999959,
+    "timestamp": 1765126748138
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126748142
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748148
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999813,
+    "timestamp": 1765126748151
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999902,
+    "timestamp": 1765126748157
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000202,
+    "timestamp": 1765126748160
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000193,
+    "timestamp": 1765126748163
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999947,
+    "timestamp": 1765126748166
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000318,
+    "timestamp": 1765126748169
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000129,
+    "timestamp": 1765126748172
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999911,
+    "timestamp": 1765126748178
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748181
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999571,
+    "timestamp": 1765126748186
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999825,
+    "timestamp": 1765126748195
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000118,
+    "timestamp": 1765126748200
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.250000000000013,
+    "timestamp": 1765126748207
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999822,
+    "timestamp": 1765126748227
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000244,
+    "timestamp": 1765126748230
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.0790348828983534,
+    "timestamp": 1765126748233
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748235
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748238
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.1640274203306418,
+    "timestamp": 1765126748241
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000597,
+    "timestamp": 1765126748246
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126748254
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999547,
+    "timestamp": 1765126748302
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6713111112159879,
+    "timestamp": 1765126748307
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748315
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999207,
+    "timestamp": 1765126748318
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6943521279224725,
+    "timestamp": 1765126748322
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748325
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999787,
+    "timestamp": 1765126748576
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.250000000000007,
+    "timestamp": 1765126748580
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000029,
+    "timestamp": 1765126748583
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000018,
+    "timestamp": 1765126748588
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000162,
+    "timestamp": 1765126748593
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999845,
+    "timestamp": 1765126748597
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748605
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999767,
+    "timestamp": 1765126748610
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999962,
+    "timestamp": 1765126748613
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000062,
+    "timestamp": 1765126748616
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748619
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748622
+  },
+  {
+    "setup": "Trend Pullback",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999556,
+    "timestamp": 1765126748627
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000444,
+    "timestamp": 1765126748630
+  },
+  {
+    "setup": "Power of Three Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748632
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999736,
+    "timestamp": 1765126748635
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748638
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000286,
+    "timestamp": 1765126748642
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748649
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999873,
+    "timestamp": 1765126748652
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.249999999999959,
+    "timestamp": 1765126748655
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126748659
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748662
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999813,
+    "timestamp": 1765126748665
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999902,
+    "timestamp": 1765126748670
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000202,
+    "timestamp": 1765126748674
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000193,
+    "timestamp": 1765126748677
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999947,
+    "timestamp": 1765126748681
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000318,
+    "timestamp": 1765126748684
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000129,
+    "timestamp": 1765126748687
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999911,
+    "timestamp": 1765126748693
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748696
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999571,
+    "timestamp": 1765126748700
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999825,
+    "timestamp": 1765126748703
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000118,
+    "timestamp": 1765126748706
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.250000000000013,
+    "timestamp": 1765126748712
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999822,
+    "timestamp": 1765126748716
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000244,
+    "timestamp": 1765126748719
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.0790348828983534,
+    "timestamp": 1765126748722
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748725
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748728
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.1640274203306418,
+    "timestamp": 1765126748731
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000597,
+    "timestamp": 1765126748735
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126748738
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999547,
+    "timestamp": 1765126748740
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6713111112159879,
+    "timestamp": 1765126748744
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748748
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999207,
+    "timestamp": 1765126748750
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6943521279224725,
+    "timestamp": 1765126748756
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126748760
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999787,
+    "timestamp": 1765126749036
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.250000000000007,
+    "timestamp": 1765126749041
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000029,
+    "timestamp": 1765126749045
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000018,
+    "timestamp": 1765126749049
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000162,
+    "timestamp": 1765126749053
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999845,
+    "timestamp": 1765126749057
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749064
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999767,
+    "timestamp": 1765126749068
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999962,
+    "timestamp": 1765126749071
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000062,
+    "timestamp": 1765126749076
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749081
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749084
+  },
+  {
+    "setup": "Trend Pullback",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999556,
+    "timestamp": 1765126749094
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000444,
+    "timestamp": 1765126749100
+  },
+  {
+    "setup": "Power of Three Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749104
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999736,
+    "timestamp": 1765126749108
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749112
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000286,
+    "timestamp": 1765126749115
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749121
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999873,
+    "timestamp": 1765126749124
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.249999999999959,
+    "timestamp": 1765126749128
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126749132
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749135
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999813,
+    "timestamp": 1765126749138
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999902,
+    "timestamp": 1765126749144
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000202,
+    "timestamp": 1765126749149
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000193,
+    "timestamp": 1765126749153
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999947,
+    "timestamp": 1765126749156
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000318,
+    "timestamp": 1765126749163
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000129,
+    "timestamp": 1765126749168
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999911,
+    "timestamp": 1765126749173
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749177
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999571,
+    "timestamp": 1765126749179
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999825,
+    "timestamp": 1765126749183
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000118,
+    "timestamp": 1765126749186
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.250000000000013,
+    "timestamp": 1765126749194
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999822,
+    "timestamp": 1765126749199
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000244,
+    "timestamp": 1765126749203
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.0790348828983534,
+    "timestamp": 1765126749206
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749210
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749215
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.1640274203306418,
+    "timestamp": 1765126749220
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000597,
+    "timestamp": 1765126749228
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126749233
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999547,
+    "timestamp": 1765126749237
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6713111112159879,
+    "timestamp": 1765126749244
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749255
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999207,
+    "timestamp": 1765126749261
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6943521279224725,
+    "timestamp": 1765126749265
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749268
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999787,
+    "timestamp": 1765126749426
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.250000000000007,
+    "timestamp": 1765126749430
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000029,
+    "timestamp": 1765126749435
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000018,
+    "timestamp": 1765126749441
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000162,
+    "timestamp": 1765126749445
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999845,
+    "timestamp": 1765126749450
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749453
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999767,
+    "timestamp": 1765126749456
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999962,
+    "timestamp": 1765126749461
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000062,
+    "timestamp": 1765126749465
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749470
+  },
+  {
+    "setup": "Trend Pullback",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999556,
+    "timestamp": 1765126749473
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749477
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000444,
+    "timestamp": 1765126749481
+  },
+  {
+    "setup": "Power of Three Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749483
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999736,
+    "timestamp": 1765126749488
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749494
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000286,
+    "timestamp": 1765126749497
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749501
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999873,
+    "timestamp": 1765126749504
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.249999999999959,
+    "timestamp": 1765126749509
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126749512
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749514
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999813,
+    "timestamp": 1765126749518
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999902,
+    "timestamp": 1765126749521
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000202,
+    "timestamp": 1765126749526
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000193,
+    "timestamp": 1765126749529
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999947,
+    "timestamp": 1765126749531
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000318,
+    "timestamp": 1765126749535
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000129,
+    "timestamp": 1765126749541
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999911,
+    "timestamp": 1765126749545
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749548
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999571,
+    "timestamp": 1765126749551
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999825,
+    "timestamp": 1765126749555
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000118,
+    "timestamp": 1765126749560
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.250000000000013,
+    "timestamp": 1765126749563
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999822,
+    "timestamp": 1765126749566
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000244,
+    "timestamp": 1765126749570
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.0790348828983534,
+    "timestamp": 1765126749572
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749577
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749581
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.1640274203306418,
+    "timestamp": 1765126749583
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000597,
+    "timestamp": 1765126749587
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126749591
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999547,
+    "timestamp": 1765126749597
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6713111112159879,
+    "timestamp": 1765126749601
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749603
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999207,
+    "timestamp": 1765126749606
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6943521279224725,
+    "timestamp": 1765126749610
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749614
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999787,
+    "timestamp": 1765126749849
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.250000000000007,
+    "timestamp": 1765126749853
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000029,
+    "timestamp": 1765126749859
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000018,
+    "timestamp": 1765126749862
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000162,
+    "timestamp": 1765126749866
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999845,
+    "timestamp": 1765126749869
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749877
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999767,
+    "timestamp": 1765126749880
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999962,
+    "timestamp": 1765126749883
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000062,
+    "timestamp": 1765126749886
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749889
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749894
+  },
+  {
+    "setup": "Trend Pullback",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999556,
+    "timestamp": 1765126749900
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000444,
+    "timestamp": 1765126749904
+  },
+  {
+    "setup": "Power of Three Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749908
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999736,
+    "timestamp": 1765126749912
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749916
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000286,
+    "timestamp": 1765126749921
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749927
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999873,
+    "timestamp": 1765126749933
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.249999999999959,
+    "timestamp": 1765126749936
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126749946
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749953
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999813,
+    "timestamp": 1765126749957
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999902,
+    "timestamp": 1765126749963
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000202,
+    "timestamp": 1765126749968
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000193,
+    "timestamp": 1765126749972
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999947,
+    "timestamp": 1765126749977
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000318,
+    "timestamp": 1765126749982
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000129,
+    "timestamp": 1765126749986
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999911,
+    "timestamp": 1765126749993
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126749996
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999571,
+    "timestamp": 1765126750000
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999825,
+    "timestamp": 1765126750004
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000118,
+    "timestamp": 1765126750008
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.250000000000013,
+    "timestamp": 1765126750015
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999822,
+    "timestamp": 1765126750020
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000244,
+    "timestamp": 1765126750023
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.0790348828983534,
+    "timestamp": 1765126750026
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750029
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750032
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.1640274203306418,
+    "timestamp": 1765126750036
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000597,
+    "timestamp": 1765126750042
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126750047
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999547,
+    "timestamp": 1765126750050
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6713111112159879,
+    "timestamp": 1765126750053
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750059
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999207,
+    "timestamp": 1765126750063
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6943521279224725,
+    "timestamp": 1765126750071
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750076
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999787,
+    "timestamp": 1765126750115
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.250000000000007,
+    "timestamp": 1765126750120
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000029,
+    "timestamp": 1765126750124
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000018,
+    "timestamp": 1765126750127
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000162,
+    "timestamp": 1765126750131
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999845,
+    "timestamp": 1765126750135
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750141
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999767,
+    "timestamp": 1765126750144
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999962,
+    "timestamp": 1765126750147
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000062,
+    "timestamp": 1765126750150
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750154
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750161
+  },
+  {
+    "setup": "Trend Pullback",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999556,
+    "timestamp": 1765126750168
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000444,
+    "timestamp": 1765126750171
+  },
+  {
+    "setup": "Power of Three Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750175
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999736,
+    "timestamp": 1765126750178
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750181
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000286,
+    "timestamp": 1765126750186
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750193
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999873,
+    "timestamp": 1765126750196
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.249999999999959,
+    "timestamp": 1765126750199
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126750202
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750205
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999813,
+    "timestamp": 1765126750214
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999902,
+    "timestamp": 1765126750217
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000202,
+    "timestamp": 1765126750221
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000193,
+    "timestamp": 1765126750225
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999947,
+    "timestamp": 1765126750228
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000318,
+    "timestamp": 1765126750235
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000129,
+    "timestamp": 1765126750255
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999911,
+    "timestamp": 1765126750328
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750346
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999571,
+    "timestamp": 1765126750349
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999825,
+    "timestamp": 1765126750352
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000118,
+    "timestamp": 1765126750355
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.250000000000013,
+    "timestamp": 1765126750363
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999822,
+    "timestamp": 1765126750369
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000244,
+    "timestamp": 1765126750388
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.0790348828983534,
+    "timestamp": 1765126750397
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750400
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750404
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.1640274203306418,
+    "timestamp": 1765126750416
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000597,
+    "timestamp": 1765126750420
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126750424
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999547,
+    "timestamp": 1765126750429
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6713111112159879,
+    "timestamp": 1765126750433
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750436
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999207,
+    "timestamp": 1765126750442
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6943521279224725,
+    "timestamp": 1765126750445
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750449
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999787,
+    "timestamp": 1765126750452
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.250000000000007,
+    "timestamp": 1765126750455
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000029,
+    "timestamp": 1765126750460
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000018,
+    "timestamp": 1765126750468
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000162,
+    "timestamp": 1765126750471
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999845,
+    "timestamp": 1765126750475
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750481
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999767,
+    "timestamp": 1765126750488
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999962,
+    "timestamp": 1765126750493
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000062,
+    "timestamp": 1765126750498
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750502
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750504
+  },
+  {
+    "setup": "Trend Pullback",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999556,
+    "timestamp": 1765126750508
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000444,
+    "timestamp": 1765126750512
+  },
+  {
+    "setup": "Power of Three Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750517
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999736,
+    "timestamp": 1765126750528
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750532
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000286,
+    "timestamp": 1765126750537
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750543
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999873,
+    "timestamp": 1765126750547
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.249999999999959,
+    "timestamp": 1765126750552
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126750562
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750566
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999813,
+    "timestamp": 1765126750570
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999902,
+    "timestamp": 1765126750573
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000202,
+    "timestamp": 1765126750577
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000193,
+    "timestamp": 1765126750580
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999947,
+    "timestamp": 1765126750586
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000318,
+    "timestamp": 1765126750589
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000129,
+    "timestamp": 1765126750592
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999911,
+    "timestamp": 1765126750595
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750601
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999571,
+    "timestamp": 1765126750606
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999825,
+    "timestamp": 1765126750619
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000118,
+    "timestamp": 1765126750623
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.250000000000013,
+    "timestamp": 1765126750628
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999822,
+    "timestamp": 1765126750631
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000244,
+    "timestamp": 1765126750636
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.0790348828983534,
+    "timestamp": 1765126750641
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750647
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750650
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.1640274203306418,
+    "timestamp": 1765126750654
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000597,
+    "timestamp": 1765126750670
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126750692
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999547,
+    "timestamp": 1765126750702
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6713111112159879,
+    "timestamp": 1765126750709
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750712
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999207,
+    "timestamp": 1765126750716
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6943521279224725,
+    "timestamp": 1765126750719
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750727
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999787,
+    "timestamp": 1765126750731
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.250000000000007,
+    "timestamp": 1765126750738
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000029,
+    "timestamp": 1765126750743
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000018,
+    "timestamp": 1765126750746
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000162,
+    "timestamp": 1765126750749
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999845,
+    "timestamp": 1765126750753
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750759
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999767,
+    "timestamp": 1765126750763
+  },
+  {
+    "setup": "Institutional Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999962,
+    "timestamp": 1765126750766
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000062,
+    "timestamp": 1765126750770
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750775
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750779
+  },
+  {
+    "setup": "Trend Pullback",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999556,
+    "timestamp": 1765126750786
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000444,
+    "timestamp": 1765126750793
+  },
+  {
+    "setup": "Power of Three Kill Zone",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750797
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999736,
+    "timestamp": 1765126750800
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750803
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000286,
+    "timestamp": 1765126750808
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750812
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999873,
+    "timestamp": 1765126750817
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.249999999999959,
+    "timestamp": 1765126750820
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126750825
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750829
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999813,
+    "timestamp": 1765126750833
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999902,
+    "timestamp": 1765126750837
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000202,
+    "timestamp": 1765126750845
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000193,
+    "timestamp": 1765126750847
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999947,
+    "timestamp": 1765126750851
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000318,
+    "timestamp": 1765126750854
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000129,
+    "timestamp": 1765126750859
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999911,
+    "timestamp": 1765126750863
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750869
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999571,
+    "timestamp": 1765126750872
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999825,
+    "timestamp": 1765126750877
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000118,
+    "timestamp": 1765126750880
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.250000000000013,
+    "timestamp": 1765126750883
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999822,
+    "timestamp": 1765126750887
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000244,
+    "timestamp": 1765126750894
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.0790348828983534,
+    "timestamp": 1765126750898
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750904
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750908
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.1640274203306418,
+    "timestamp": 1765126750911
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000597,
+    "timestamp": 1765126750915
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999643,
+    "timestamp": 1765126750920
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999547,
+    "timestamp": 1765126750923
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6713111112159879,
+    "timestamp": 1765126750928
+  },
+  {
+    "setup": "Breaker Retest",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750931
+  },
+  {
+    "setup": "Asia Sweep Reversal",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999207,
+    "timestamp": 1765126750934
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 0.6943521279224725,
+    "timestamp": 1765126750939
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765126750944
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1765144027920
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1,
+    "timestamp": 1765144048814
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1,
+    "timestamp": 1765144072359
+  },
+  {
+    "setup": "Manual Chart Trade",
+    "session": "Unknown",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1,
+    "timestamp": 1765144072363
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999132,
+    "timestamp": 1765144107389
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2499999999999423,
+    "timestamp": 1765144112854
+  },
+  {
+    "setup": "Trend Pullback",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.249999999999939,
+    "timestamp": 1765144132368
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "win",
+    "rMultiple": 1.250000000000124,
+    "timestamp": 1765144139627
+  },
+  {
+    "setup": "Engulfing Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000842,
+    "timestamp": 1765144154278
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765144157260
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.249999999999934,
+    "timestamp": 1765144169609
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000744,
+    "timestamp": 1765144172615
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "London",
+    "bias": "Bearish",
+    "result": "win",
+    "rMultiple": 1.2500000000000482,
+    "timestamp": 1765144185605
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bearish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765144189332
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bearish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765144200260
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "London",
+    "bias": "Bearish",
+    "result": "loss",
+    "rMultiple": 1.249999999999963,
+    "timestamp": 1765144218295
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bearish",
+    "result": "loss",
+    "rMultiple": 1.249999999999963,
+    "timestamp": 1765144220678
+  },
+  {
+    "setup": "Sweep + Shift",
+    "session": "London",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.2500000000000755,
+    "timestamp": 1765144234305
+  },
+  {
+    "setup": "Liquidity Void Return",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.250000000000025,
+    "timestamp": 1765144242608
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "London",
+    "bias": "Bearish",
+    "result": "loss",
+    "rMultiple": 0.5287271102747393,
+    "timestamp": 1765144249885
+  },
+  {
+    "setup": "Asian Range Breakout",
+    "session": "New York",
+    "bias": "Bullish",
+    "result": "loss",
+    "rMultiple": 1.25,
+    "timestamp": 1765147390782
   }
 ]
