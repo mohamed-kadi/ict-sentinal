@@ -2151,11 +2151,19 @@ export function computeHtfLevels(candles: Candle[]): HtfLevels {
   };
 }
 
-export function detectLiquiditySweeps(candles: Candle[], tolerancePct = 0.0005): LiquiditySweep[] {
+export function detectLiquiditySweeps(
+  candles: Candle[],
+  tolerancePct = 0.0005,
+  minSpacingBars = 3,
+): LiquiditySweep[] {
   const sweeps: LiquiditySweep[] = [];
   if (candles.length < 3) return sweeps;
   const levelsHigh: { price: number; time: number }[] = [];
   const levelsLow: { price: number; time: number }[] = [];
+  let lastHighSweepIdx = -Infinity;
+  let lastHighSweepPrice = NaN;
+  let lastLowSweepIdx = -Infinity;
+  let lastLowSweepPrice = NaN;
 
   // find equal highs/lows
   for (let i = 1; i < candles.length; i++) {
@@ -2175,12 +2183,24 @@ export function detectLiquiditySweeps(candles: Candle[], tolerancePct = 0.0005):
   for (let i = 1; i < candles.length; i++) {
     const c = candles[i];
     const sweptHigh = levelsHigh.find((l) => c.h > l.price && c.t > l.time);
-    if (sweptHigh) {
+    if (
+      sweptHigh &&
+      i - lastHighSweepIdx >= minSpacingBars &&
+      (Number.isNaN(lastHighSweepPrice) || Math.abs(sweptHigh.price - lastHighSweepPrice) > sweptHigh.price * tolerancePct)
+    ) {
       sweeps.push({ time: c.t, price: sweptHigh.price, type: 'eqh', direction: 'up' });
+      lastHighSweepIdx = i;
+      lastHighSweepPrice = sweptHigh.price;
     }
     const sweptLow = levelsLow.find((l) => c.l < l.price && c.t > l.time);
-    if (sweptLow) {
+    if (
+      sweptLow &&
+      i - lastLowSweepIdx >= minSpacingBars &&
+      (Number.isNaN(lastLowSweepPrice) || Math.abs(sweptLow.price - lastLowSweepPrice) > sweptLow.price * tolerancePct)
+    ) {
       sweeps.push({ time: c.t, price: sweptLow.price, type: 'eql', direction: 'down' });
+      lastLowSweepIdx = i;
+      lastLowSweepPrice = sweptLow.price;
     }
   }
 

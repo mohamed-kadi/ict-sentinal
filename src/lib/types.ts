@@ -23,6 +23,18 @@ export type Swing = {
   type: 'high' | 'low';
 };
 
+export type StrongWeakSwing = Swing & {
+  strength: 'strong' | 'weak';
+};
+
+export type DailyCandle = {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
+
 export type Gap = {
   startTime: number;
   endTime: number;
@@ -115,4 +127,30 @@ export type HtfLevels = {
   prevWeekLow: number | null;
   weekOpen: number | null;
   monthOpen: number | null;
+};
+
+export type Model2022Signal = {
+  time: number;
+  direction: 'buy' | 'sell';
+  label: 'BUY SETUP' | 'SELL SETUP';
+  fvg: Gap;
+  entry: number;
+  stop?: number;
+  basis: string[];
+};
+
+export type DailyLiquidity = {
+  pdh: number | null;
+  pdl: number | null;
+  last3Highs: Array<{ price: number; date: string }>;
+  last3Lows: Array<{ price: number; date: string }>;
+  midnightOpen: number | null;
+};
+
+export type Model2022State = {
+  strongSwings: StrongWeakSwing[];
+  obWithDisplacement: OrderBlock[];
+  dailyCandle: DailyCandle | null;
+  dailyLiquidity: DailyLiquidity;
+  m15Signals: Model2022Signal[];
 };

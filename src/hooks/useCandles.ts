@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
 import { AssetClass, Candle, Timeframe } from '@/lib/types';
 
 type CandleResponse = {
@@ -58,9 +58,15 @@ async function fetchCandles(
 export function useCandles(assetClass: AssetClass, symbol: string, timeframe: Timeframe) {
   const chunk =
     assetClass === 'crypto' ? Math.min(CRYPTO_CHUNK, 1000) : Math.min(FOREX_CHUNK, 5000);
-  const query = useInfiniteQuery({
+  const query = useInfiniteQuery<
+    CandlePage, // TQueryFnData
+    Error, // TError
+    InfiniteData<CandlePage>, // TData (infinite shape)
+    [string, AssetClass, string, Timeframe, number], // TQueryKey
+    number | null // TPageParam
+  >({
     queryKey: ['candles', assetClass, symbol, timeframe, chunk],
-    queryFn: ({ pageParam }) => fetchCandles(assetClass, symbol, timeframe, chunk, pageParam ?? null),
+    queryFn: ({ pageParam = null }) => fetchCandles(assetClass, symbol, timeframe, chunk, pageParam),
     initialPageParam: null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     refetchInterval: assetClass === 'crypto' ? 10_000 : 15_000,
@@ -78,9 +84,64 @@ export function useCandles(assetClass: AssetClass, symbol: string, timeframe: Ti
       .slice(-12_000);
   }, [query.data]);
 
+  const [liveCandle, setLiveCandle] = useState<Candle | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    if (assetClass !== 'crypto') {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      return;
+    }
+    const interval = timeframeToBinanceInterval(timeframe);
+    if (!interval) return;
+    const streamSymbol = symbol.toLowerCase();
+    const url = `wss://stream.binance.com:9443/ws/${streamSymbol}@kline_${interval}`;
+    const ws = new WebSocket(url);
+    wsRef.current = ws;
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const k = data.k;
+        if (!k) return;
+        const candle: Candle = {
+          t: k.t,
+          o: Number(k.o),
+          h: Number(k.h),
+          l: Number(k.l),
+          c: Number(k.c),
+          v: Number(k.v),
+        };
+        setLiveCandle(candle);
+      } catch {
+        // ignore malformed
+      }
+    };
+    ws.onerror = () => {
+      ws.close();
+    };
+    return () => {
+      ws.close();
+      wsRef.current = null;
+    };
+  }, [assetClass, symbol, timeframe]);
+
+  const mergedCandles = useMemo(() => {
+    if (!liveCandle) return candles;
+    const list = [...candles];
+    const last = list.at(-1);
+    if (last && liveCandle.t >= last.t) {
+      list[list.length - 1] = liveCandle;
+      return list;
+    }
+    return list;
+  }, [candles, liveCandle]);
+
   const latestPage = query.data?.pages?.[0];
   return {
-    candles,
+    candles: mergedCandles,
     source: latestPage?.source,
     warning: latestPage?.warning,
     detail: latestPage?.detail,
@@ -93,4 +154,19 @@ export function useCandles(assetClass: AssetClass, symbol: string, timeframe: Ti
     error: query.error,
     refetch: query.refetch,
   };
+}
+
+function timeframeToBinanceInterval(tf: Timeframe): string | null {
+  switch (tf) {
+    case '1m':
+    case '5m':
+    case '15m':
+    case '1h':
+    case '4h':
+      return tf;
+    case '1D':
+      return '1d';
+    default:
+      return null;
+  }
 }

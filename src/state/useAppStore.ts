@@ -14,8 +14,11 @@ type OverlayKey =
   | 'sweeps'
   | 'breakers'
   | 'oteBands'
+  | 'pdZones'
   | 'inversionFvgSignals'
-  | 'tradeMarkers';
+  | 'tradeMarkers'
+  | 'structureSegments'
+  | 'eqConnectors';
 
 export type BacktestTrade = {
   id: string;
@@ -62,6 +65,7 @@ type AppState = {
   selectedSetup: string;
   backtest: BacktestState;
   sidebarOpen: boolean;
+  infoOpen: boolean;
   drawingMode: DrawingType | 'none';
   drawings: Drawing[];
   clockTz: string;
@@ -76,6 +80,7 @@ type AppState = {
   addTrade: (trade: BacktestTrade) => void;
   clearTrades: () => void;
   toggleSidebar: () => void;
+  toggleInfo: () => void;
   setDrawingMode: (mode: DrawingType | 'none') => void;
   addDrawing: (drawing: Drawing) => void;
   clearDrawings: () => void;
@@ -111,12 +116,16 @@ export const useAppStore = create<AppState>()(
         sweeps: true,
         breakers: false,
         oteBands: true,
+        pdZones: true,
         inversionFvgSignals: true,
         tradeMarkers: true,
+        structureSegments: true,
+        eqConnectors: true,
       },
       selectedSetup: 'all',
       backtest: { enabled: false, playing: false, speed: 1, cursor: 0, trades: [], balance: 0, autoTrade: false },
       sidebarOpen: true,
+      infoOpen: false,
       drawingMode: 'none',
       drawings: [],
       clockTz: 'America/New_York',
@@ -160,6 +169,10 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           sidebarOpen: !state.sidebarOpen,
         })),
+      toggleInfo: () =>
+        set((state) => ({
+          infoOpen: !state.infoOpen,
+        })),
       setDrawingMode: (mode) => set({ drawingMode: mode }),
       addDrawing: (drawing) =>
         set((state) => ({
@@ -195,6 +208,7 @@ export const useAppStore = create<AppState>()(
         selectedSetup: state.selectedSetup,
         backtest: state.backtest,
         sidebarOpen: state.sidebarOpen,
+        infoOpen: state.infoOpen,
         drawingMode: state.drawingMode,
         drawings: state.drawings,
         clockTz: state.clockTz,

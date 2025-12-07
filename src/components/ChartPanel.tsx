@@ -27,6 +27,7 @@ import {
   DrawingType,
   Bias,
   Timeframe,
+  Model2022State,
 } from "@/lib/types";
 import { SESSION_ZONES } from "@/lib/config";
 import { classifySession } from "@/lib/ict";
@@ -35,6 +36,7 @@ import { CLOCK_OPTIONS, formatWithTz, getClockLabel } from "@/lib/time";
 import { evaluateIctScanner } from "@/lib/ictScanner";
 import { useAppStore, type BacktestState, type BacktestTrade } from "@/state/useAppStore";
 import { useShallow } from "zustand/react/shallow";
+import { clamp } from "@/lib/utils";
 
 const ADVANCED_SETUPS = new Set(["Silver Bullet", "Turtle Soup"]);
 const TIER_ONE_SETUPS = new Set([
@@ -97,6 +99,7 @@ type Props = {
   selectedSetup?: string;
   bias?: Bias;
   latestPrice?: number | null;
+  model2022?: Model2022State;
   overlays: Record<
     | "liquidity"
     | "fvg"
@@ -108,7 +111,9 @@ type Props = {
     | "breakers"
     | "oteBands"
     | "inversionFvgSignals"
-    | "tradeMarkers",
+    | "tradeMarkers"
+    | "structureSegments"
+    | "eqConnectors",
     boolean
   >;
 };
@@ -136,6 +141,7 @@ export function ChartPanel({
   selectedSetup = "all",
   bias,
   latestPrice,
+  model2022,
   overlays,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -213,6 +219,14 @@ export function ChartPanel({
   const [fvgBoxes, setFvgBoxes] = useState<OverlayBox[]>([]);
   const [obBoxes, setObBoxes] = useState<OverlayBox[]>([]);
   const [breakerBoxes, setBreakerBoxes] = useState<OverlayBox[]>([]);
+  const [pdZones, setPdZones] = useState<OverlayBox[]>([]);
+  const [model2022Boxes, setModel2022Boxes] = useState<OverlayBox[]>([]);
+  const [signalBoxes, setSignalBoxes] = useState<OverlayBox[]>([]);
+  const [structureSegments, setStructureSegments] = useState<OverlayBox[]>([]);
+  const [eqSegments, setEqSegments] = useState<
+    Array<{ id: string; x1: number; x2: number; y: number; label: string; color: string }>
+  >([]);
+  const [viewportVersion, setViewportVersion] = useState(0);
   const [pendingPoints, setPendingPoints] = useState<{ time: number; price: number }[]>([]);
   const [previewPoint, setPreviewPoint] = useState<{ time: number; price: number } | null>(null);
   const [isPointerDown, setIsPointerDown] = useState(false);
@@ -244,6 +258,11 @@ export function ChartPanel({
   const lastDatasetKeyRef = useRef(datasetKey);
   const lastCandleTimeRef = useRef<number | null>(candles.at(-1)?.t ?? null);
   const timeframeMs = useMemo(() => timeframeToMs(timeframe), [timeframe]);
+  const swingStrengthMap = useMemo(() => {
+    const map = new Map<number, "strong" | "weak">();
+    model2022?.strongSwings.forEach((sw) => map.set(sw.time, sw.strength));
+    return map;
+  }, [model2022]);
   const staleSignalThreshold = useMemo(
     () => Math.max(timeframeMs * 2, 15 * 60_000),
     [timeframeMs],
@@ -1408,6 +1427,25 @@ export function ChartPanel({
   }, [candles.length]);
 
   useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const timeScale = chart.timeScale();
+    const bump = () => setViewportVersion((v) => v + 1);
+    // React to pan/zoom to keep overlay coordinates in sync
+    timeScale.subscribeVisibleTimeRangeChange?.(bump);
+    // Some builds expose logical range change instead of time range
+    const logicalRangeSub = timeScale as unknown as {
+      subscribeVisibleLogicalRangeChange?: (handler: () => void) => void;
+      unsubscribeVisibleLogicalRangeChange?: (handler: () => void) => void;
+    };
+    logicalRangeSub.subscribeVisibleLogicalRangeChange?.(bump);
+    return () => {
+      timeScale.unsubscribeVisibleTimeRangeChange?.(bump);
+      logicalRangeSub.unsubscribeVisibleLogicalRangeChange?.(bump);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!seriesRef.current) return;
     seriesRef.current.setData(
       candles.map((c) => ({
@@ -1531,22 +1569,29 @@ export function ChartPanel({
     const chart = chartRef.current;
     const timeScale = chart?.timeScale();
     const ranges: { start: number; end: number; label: string }[] = [];
-    let currentLabel: string | null = null;
-    let currentStart = candles[0].t;
+    let active: { start: number; label: string } | null = null;
     for (let i = 0; i < candles.length; i++) {
       const c = candles[i];
       const session = classifySession(new Date(c.t), SESSION_ZONES);
-      const label = session?.label ?? "Other";
-      if (currentLabel === null) {
-        currentLabel = label;
-        currentStart = c.t;
-      } else if (label !== currentLabel) {
-        ranges.push({ start: currentStart, end: c.t, label: currentLabel });
-        currentLabel = label;
-        currentStart = c.t;
+      const hour = new Date(c.t).getUTCHours();
+      const killStart = session?.killStartHour;
+      const killEnd = session?.killEndHour;
+      const killActive = session
+        ? killStart != null && killEnd != null
+          ? hour >= killStart && hour < killEnd
+          : true
+        : false;
+      const label = killActive && session ? `${session.label} Kill Zone` : null;
+      if (label && !active) {
+        active = { start: c.t, label };
+      } else if (!label && active) {
+        ranges.push({ start: active.start, end: c.t, label: active.label });
+        active = null;
       }
     }
-    ranges.push({ start: currentStart, end: candles.at(-1)!.t, label: currentLabel ?? "Other" });
+    if (active) {
+      ranges.push({ start: active.start, end: candles.at(-1)!.t, label: active.label });
+    }
 
     const mapCoord = (ms: number) => {
       const tsVal = (ms / 1000) as UTCTimestamp;
@@ -1582,13 +1627,38 @@ export function ChartPanel({
     if (!markersPluginRef.current) return;
     const markers: SeriesMarker<UTCTimestamp>[] = [];
 
-    if (overlays.liquidity && swings) {
+    const swingMarkers: Swing[] = [];
+    if (swings && swings.length) {
+      const byTimeDesc = [...swings].reverse();
+      const getStrength = (s: Swing) => swingStrengthMap.get(s.time) ?? 'weak';
+      const pickLast = (predicate: (s: Swing) => boolean) => byTimeDesc.find(predicate);
+      const candidates = [
+        (s: Swing) => s.type === "high" && getStrength(s) === "strong",
+        (s: Swing) => s.type === "low" && getStrength(s) === "strong",
+        (s: Swing) => s.type === "high" && getStrength(s) === "weak",
+        (s: Swing) => s.type === "low" && getStrength(s) === "weak",
+      ];
+      candidates.forEach((fn) => {
+        const hit = pickLast(fn);
+        if (hit) swingMarkers.push(hit);
+      });
+    }
+    if (overlays.liquidity && swingMarkers.length) {
       markers.push(
-        ...swings.map((s) => ({
+        ...swingMarkers.map((s) => ({
           time: (s.time / 1000) as UTCTimestamp,
           position: s.type === "high" ? ("aboveBar" as const) : ("belowBar" as const),
-          color: "#a78bfa",
-          shape: "circle" as const,
+          color:
+            swingStrengthMap.get(s.time) === "strong"
+              ? s.type === "high"
+                ? "#fb923c"
+                : "#22c55e"
+              : "#a78bfa",
+          shape: swingStrengthMap.has(s.time) ? ("square" as const) : ("circle" as const),
+          text: swingStrengthMap.has(s.time)
+            ? `${swingStrengthMap.get(s.time) === "strong" ? "Strong" : "Weak"} ${s.type === "high" ? "High" : "Low"}`
+            : undefined,
+          size: 0.85,
         })),
       );
     }
@@ -1600,6 +1670,7 @@ export function ChartPanel({
           position: "aboveBar" as const,
           color: g.type === "bullish" ? "#38bdf8" : "#f59e0b",
           shape: "square" as const,
+          size: 0.8,
         })),
       );
     }
@@ -1617,18 +1688,34 @@ export function ChartPanel({
           shape: s.direction === "buy" ? ("arrowUp" as const) : ("arrowDown" as const),
           text: s.setup ? formatSetupShort(s.setup) : s.direction === "buy" ? "Buy" : "Sell",
           id: `sig-${s.time}-${s.setup ?? s.direction}`,
+          size: 0.85,
         })),
       );
     }
 
-    if (overlays.liquidity && structureShifts?.length) {
+    if (overlays.signals && model2022?.m15Signals?.length) {
+      markers.push(
+        ...model2022.m15Signals.map((sig) => ({
+          time: (sig.time / 1000) as UTCTimestamp,
+          position: sig.direction === "buy" ? ("belowBar" as const) : ("aboveBar" as const),
+          color: sig.direction === "buy" ? "#14b8a6" : "#fb923c",
+          shape: "square" as const,
+          text: sig.label,
+          id: `m22-${sig.time}-${sig.direction}`,
+          size: 0.85,
+        })),
+      );
+    }
+
+    if (overlays.structureSegments && structureShifts?.length) {
       markers.push(
         ...structureShifts.map((b) => ({
           time: (b.time / 1000) as UTCTimestamp,
           position: b.direction === "bullish" ? ("belowBar" as const) : ("aboveBar" as const),
           color: b.direction === "bullish" ? "#22d3ee" : "#fb7185",
           shape: b.direction === "bullish" ? ("arrowUp" as const) : ("arrowDown" as const),
-          text: b.label,
+          text: b.label === "CHoCH" ? "MSS" : b.label,
+          size: 0.85,
         })),
       );
     }
@@ -1642,18 +1729,21 @@ export function ChartPanel({
           color: "#facc15",
           shape: "circle" as const,
           text: m.label,
+          size: 0.75,
         })),
       );
     }
 
     if (overlays.sweeps && sweeps?.length) {
+      const recentSweeps = sweeps.slice(-4); // keep chart clean: show only latest few sweeps
       markers.push(
-        ...sweeps.map((s) => ({
+        ...recentSweeps.map((s) => ({
           time: (s.time / 1000) as UTCTimestamp,
           position: s.direction === "up" ? ("aboveBar" as const) : ("belowBar" as const),
           color: s.type === "eqh" ? "#a855f7" : "#f97316",
           shape: s.direction === "up" ? ("arrowUp" as const) : ("arrowDown" as const),
-          text: s.type === "eqh" ? "EQH Sweep" : "EQL Sweep",
+          text: s.type === "eqh" ? "EQH" : "EQL",
+          size: 0.8,
         })),
       );
     }
@@ -1667,6 +1757,7 @@ export function ChartPanel({
           shape: trade.direction === 'buy' ? ('arrowUp' as const) : ('arrowDown' as const),
           text: formatTradeMarkerLabel(trade),
           id: `trade-${trade.id ?? idx}`,
+          size: 0.85,
         })),
       );
     }
@@ -1686,10 +1777,13 @@ export function ChartPanel({
     overlays.sweeps,
     overlays.inversionFvgSignals,
     overlays.tradeMarkers,
+    overlays.structureSegments,
     markersPluginReady,
     candles,
     selectedSetup,
     matchesSelectedSetup,
+    model2022?.m15Signals,
+    swingStrengthMap,
   ]);
 
   useEffect(() => {
@@ -1742,6 +1836,47 @@ export function ChartPanel({
       setFvgBoxes((prev) => (prev.length ? [] : prev));
     }
 
+    if (overlays.pdZones && premiumDiscount && chartWidth > 0 && chartHeight > 0) {
+      const yHigh = priceToY(premiumDiscount.high);
+      const yLow = priceToY(premiumDiscount.low);
+      const yEq = priceToY(premiumDiscount.equilibrium);
+      if (yHigh != null && yLow != null && yEq != null) {
+        const premiumTop = Math.min(yHigh, yEq);
+        const premiumHeight = Math.max(4, Math.abs(yHigh - yEq));
+        const discountTop = Math.min(yEq, yLow);
+        const discountHeight = Math.max(4, Math.abs(yEq - yLow));
+        const zones: OverlayBox[] = [
+          {
+            id: "pd-premium",
+            left: 0,
+            width: Math.max(10, chartWidth),
+            top: premiumTop,
+            height: premiumHeight,
+            color: "rgba(248,113,113,0.08)",
+            gradient: "linear-gradient(180deg, rgba(248,113,113,0.16) 0%, rgba(248,113,113,0.02) 100%)",
+            textColor: "#fed7aa",
+            label: "Premium Zone",
+          },
+          {
+            id: "pd-discount",
+            left: 0,
+            width: Math.max(10, chartWidth),
+            top: discountTop,
+            height: discountHeight,
+            color: "rgba(34,197,94,0.08)",
+            gradient: "linear-gradient(180deg, rgba(34,197,94,0.16) 0%, rgba(34,197,94,0.02) 100%)",
+            textColor: "#bbf7d0",
+            label: "Discount Zone",
+          },
+        ];
+        setPdZones((prev) => (areOverlayBoxesEqual(prev, zones) ? prev : zones));
+      } else {
+        setPdZones((prev) => (prev.length ? [] : prev));
+      }
+    } else {
+      setPdZones((prev) => (prev.length ? [] : prev));
+    }
+
     if (overlays.orderBlocks && orderBlocks && chartWidth > 0 && chartHeight > 0) {
       const boxes: typeof obBoxes = [];
       orderBlocks.slice(-8).forEach((b, idx) => {
@@ -1753,12 +1888,24 @@ export function ChartPanel({
         const left = Math.min(x1, x2);
         const baseRight = Math.max(x1, x2);
         const extendedRight = lastVisibleX != null ? Math.max(baseRight, lastVisibleX) : baseRight + 60;
+        const modelAligned =
+          model2022?.obWithDisplacement?.some(
+            (ob) =>
+              Math.abs(ob.startTime - b.startTime) < 1_200 &&
+              Math.abs(ob.high - b.high) < 1e-8 &&
+              Math.abs(ob.low - b.low) < 1e-8 &&
+              ob.type === b.type,
+          ) ?? false;
         const fill = b.type === "bullish" ? "rgba(34,197,94,0.16)" : "rgba(248,113,113,0.16)";
         const gradient =
           b.type === "bullish"
             ? "linear-gradient(90deg, rgba(34,197,94,0.2) 0%, rgba(34,197,94,0.02) 90%)"
             : "linear-gradient(90deg, rgba(248,113,113,0.2) 0%, rgba(248,113,113,0.02) 90%)";
-        const border = b.type === "bullish" ? "rgba(52,211,153,0.8)" : "rgba(248,113,113,0.8)";
+        const border = modelAligned
+          ? "rgba(251,191,36,0.9)"
+          : b.type === "bullish"
+            ? "rgba(52,211,153,0.8)"
+            : "rgba(248,113,113,0.8)";
         const textColor = "#fef3c7";
         boxes.push({
           id: `ob-${idx}-${b.startTime}`,
@@ -1768,9 +1915,9 @@ export function ChartPanel({
           height: Math.max(2, Math.abs(yTop - yBot)),
           color: fill,
           borderColor: border,
-           gradient,
-           textColor,
-          label: `${b.type === "bullish" ? "Bull" : "Bear"} OB`,
+          gradient,
+          textColor,
+          label: `${b.type === "bullish" ? "Bull" : "Bear"} OB${modelAligned ? " + FVG" : ""}`,
         });
       });
       setObBoxes((prev) => (areOverlayBoxesEqual(prev, boxes) ? prev : boxes));
@@ -1822,6 +1969,145 @@ export function ChartPanel({
       setBreakerBoxes((prev) => (prev.length ? [] : prev));
     }
 
+    if (model2022?.m15Signals?.length && chartWidth > 0 && chartHeight > 0) {
+      const boxes: typeof model2022Boxes = [];
+      model2022.m15Signals.slice(-4).forEach((sig, idx) => {
+        const g = sig.fvg;
+        const x1 = timeToX(g.startTime);
+        const x2 = timeToX(g.endTime);
+        const yTop = priceToY(Math.max(g.top, g.bottom));
+        const yBot = priceToY(Math.min(g.top, g.bottom));
+        if (x1 == null || x2 == null || yTop == null || yBot == null) return;
+        const left = Math.min(x1, x2);
+        const baseRight = Math.max(x1, x2);
+        const extendedRight = lastVisibleX != null ? Math.max(baseRight, lastVisibleX) : baseRight + 60;
+        const fill = sig.direction === "buy" ? "rgba(16,185,129,0.18)" : "rgba(249,115,22,0.2)";
+        const gradient =
+          sig.direction === "buy"
+            ? "linear-gradient(180deg, rgba(16,185,129,0.25) 0%, rgba(16,185,129,0.05) 95%)"
+            : "linear-gradient(180deg, rgba(249,115,22,0.28) 0%, rgba(249,115,22,0.05) 95%)";
+        const border = sig.direction === "buy" ? "rgba(34,211,238,0.9)" : "rgba(251,191,36,0.95)";
+        boxes.push({
+          id: `m22-box-${idx}-${g.startTime}`,
+          left,
+          width: Math.max(20, extendedRight - left),
+          top: Math.min(yTop, yBot),
+          height: Math.max(2, Math.abs(yTop - yBot)),
+          color: fill,
+          borderColor: border,
+          gradient,
+          textColor: "#f8fafc",
+          label: sig.label,
+        });
+      });
+      setModel2022Boxes((prev) => (areOverlayBoxesEqual(prev, boxes) ? prev : boxes));
+    } else {
+      setModel2022Boxes((prev) => (prev.length ? [] : prev));
+    }
+
+    if (overlays.eqConnectors && equalHighsLows && chartWidth > 0 && chartHeight > 0) {
+      const segs: Array<{ id: string; x1: number; x2: number; y: number; label: string; color: string }> = [];
+      const recent = equalHighsLows.slice(-6);
+      recent.forEach((lvl, idx) => {
+        const timesForLevel = sweeps
+          ?.filter((s) => s.price === lvl.price)
+          ?.map((s) => s.time) ?? [];
+        const t1 = timesForLevel.at(0) ?? candles.at(-2)?.t ?? lvl.times[0];
+        const t2 = timesForLevel.at(-1) ?? candles.at(-1)?.t ?? lvl.times.at(-1) ?? t1;
+        const x1 = timeToX(t1);
+        const x2 = timeToX(t2);
+        const y = priceToY(lvl.price);
+        if (x1 == null || x2 == null || y == null) return;
+        const left = Math.min(x1, x2);
+        const right = Math.max(x1, x2);
+        const color = lvl.kind === "highs" ? "#a855f7" : "#f97316";
+        segs.push({
+          id: `eq-seg-${idx}-${lvl.price}`,
+          x1: left,
+          x2: right,
+          y,
+          label: lvl.kind === "highs" ? "EQH" : "EQL",
+          color,
+        });
+      });
+      setEqSegments((prev) => {
+        if (prev.length === segs.length && prev.every((p, i) => p.id === segs[i].id && p.x1 === segs[i].x1 && p.x2 === segs[i].x2 && p.y === segs[i].y)) {
+          return prev;
+        }
+        return segs;
+      });
+    } else {
+      setEqSegments((prev) => (prev.length ? [] : prev));
+    }
+
+    if (overlays.signals && signals && chartWidth > 0 && chartHeight > 0) {
+      const boxes: OverlayBox[] = [];
+      const filtered =
+        selectedSetup === "all"
+          ? signals.slice(-12)
+          : signals.filter((s) => matchesSelectedSetup(s.setup)).slice(-12);
+      filtered.forEach((s, idx) => {
+        const x = timeToX(s.time);
+        const y = priceToY(s.price);
+        if (x == null || y == null) return;
+        const width = 118;
+        const height = 22;
+        const left = clamp(x - width / 2, 4, Math.max(4, (chartWidth || width) - width - 4));
+        const top = clamp(y - height - 6, 4, Math.max(4, (chartHeight || height) - height - 4));
+        const bullish = s.direction === "buy";
+        const fill = bullish ? "rgba(34,197,94,0.2)" : "rgba(248,113,113,0.22)";
+        const gradient = bullish
+          ? "linear-gradient(180deg, rgba(16,185,129,0.35) 0%, rgba(16,185,129,0.08) 95%)"
+          : "linear-gradient(180deg, rgba(248,113,113,0.35) 0%, rgba(248,113,113,0.08) 95%)";
+        const border = bullish ? "rgba(16,185,129,0.8)" : "rgba(248,113,113,0.85)";
+        boxes.push({
+          id: `sig-box-${idx}-${s.time}`,
+          left,
+          width,
+          top,
+          height,
+          color: fill,
+          borderColor: border,
+          gradient,
+          textColor: "#f8fafc",
+          label: formatSetupShort(s.setup ?? (bullish ? "BUY" : "SELL")),
+        });
+      });
+      setSignalBoxes((prev) => (areOverlayBoxesEqual(prev, boxes) ? prev : boxes));
+    } else {
+      setSignalBoxes((prev) => (prev.length ? [] : prev));
+    }
+
+    if (overlays.structureSegments && structureShifts && chartWidth > 0 && chartHeight > 0) {
+      const segs: OverlayBox[] = [];
+      structureShifts.slice(-6).forEach((sh, idx) => {
+        const x = timeToX(sh.time);
+        const y = priceToY(sh.price);
+        if (x == null || y == null) return;
+        const width = 52;
+        const height = 2;
+        const left = clamp(x - width / 2, 4, Math.max(4, (chartWidth || width) - width - 4));
+        const top = clamp(y - height / 2, 4, Math.max(4, (chartHeight || height) - height - 4));
+        const bullish = sh.direction === "bullish";
+        const color = bullish ? "rgba(52,211,153,0.9)" : "rgba(248,113,113,0.9)";
+        const label = sh.label; // show CHoCH/BOS as-is for clarity
+        segs.push({
+          id: `shift-${idx}-${sh.time}`,
+          left,
+          width,
+          top,
+          height: Math.max(2, height),
+          color,
+          borderColor: color,
+          textColor: color,
+          label,
+        });
+      });
+      setStructureSegments((prev) => (areOverlayBoxesEqual(prev, segs) ? prev : segs));
+    } else {
+      setStructureSegments((prev) => (prev.length ? [] : prev));
+    }
+
   }, [
     gaps,
     orderBlocks,
@@ -1829,9 +2115,25 @@ export function ChartPanel({
     overlays.fvg,
     overlays.orderBlocks,
     overlays.breakers,
+    premiumDiscount,
+    model2022?.m15Signals,
+    model2022?.obWithDisplacement,
+    overlays.signals,
+    overlays.liquidity,
+    overlays.sweeps,
+    overlays.structureSegments,
+    overlays.eqConnectors,
+    overlays.pdZones,
+    signals,
+    selectedSetup,
+    matchesSelectedSetup,
     chartWidth,
     chartHeight,
+    structureShifts,
+    sweeps,
+    equalHighsLows,
     candles,
+    viewportVersion,
   ]);
 
   useEffect(() => {
@@ -1930,161 +2232,15 @@ export function ChartPanel({
     slTpLinesRef.current.forEach((line) => seriesRef.current?.removePriceLine(line));
     slTpLinesRef.current = [];
 
-    if (overlays.fvg && gaps) {
-      gapZonesRef.current = gaps.slice(-10).map((g) =>
-        seriesRef.current!.createPriceLine({
-          price: (g.top + g.bottom) / 2,
-          color: g.type === "bullish" ? "#38bdf877" : "#f59e0b77",
-          lineStyle: LineStyle.Dashed,
-          lineWidth: 2,
-          title: g.type === "bullish" ? "Bull FVG" : "Bear FVG",
-        }),
-      );
-    }
+    // FVG price lines suppressed; shown as boxes on-chart
 
-    if (premiumDiscount) {
-      const lines: IPriceLine[] = [];
-      lines.push(
-        seriesRef.current!.createPriceLine({
-          price: premiumDiscount.high,
-          color: "#22d3ee55",
-          lineStyle: LineStyle.Solid,
-          lineWidth: 1,
-          title: "Range High",
-        }),
-      );
-      lines.push(
-        seriesRef.current!.createPriceLine({
-          price: premiumDiscount.low,
-          color: "#fb718555",
-          lineStyle: LineStyle.Solid,
-          lineWidth: 1,
-          title: "Range Low",
-        }),
-      );
-      lines.push(
-        seriesRef.current!.createPriceLine({
-          price: premiumDiscount.equilibrium,
-          color: "#e5e7ebaa",
-          lineStyle: LineStyle.Dashed,
-          lineWidth: 2,
-          title: "Equilibrium 50%",
-        }),
-      );
-      pdLinesRef.current = lines;
+    // premium/discount/OTE horizontal lines suppressed to keep chart clean; zones are shown via shading/badges
 
-      if (overlays.oteBands) {
-        const range = premiumDiscount.high - premiumDiscount.low;
-        const ote62 = premiumDiscount.high - range * 0.62;
-        const ote705 = premiumDiscount.high - range * 0.705;
-        oteLinesRef.current = [
-          seriesRef.current!.createPriceLine({
-            price: ote62,
-            color: "#38bdf8aa",
-            lineStyle: LineStyle.Dotted,
-            lineWidth: 2,
-            title: "OTE 62%",
-          }),
-          seriesRef.current!.createPriceLine({
-            price: ote705,
-            color: "#38bdf8aa",
-            lineStyle: LineStyle.Dotted,
-            lineWidth: 2,
-            title: "OTE 70.5%",
-          }),
-        ];
-      }
-    }
+    // EQH/EQL price lines suppressed; shown as badges/markers instead
 
-    if (overlays.sweeps && equalHighsLows && seriesRef.current) {
-      eqLinesRef.current = equalHighsLows.slice(-10).map((lvl) =>
-        seriesRef.current!.createPriceLine({
-          price: lvl.price,
-          color: lvl.kind === "highs" ? "#8b5cf6aa" : "#f97316aa",
-          lineStyle: LineStyle.Dashed,
-          lineWidth: 1,
-          title: lvl.kind === "highs" ? "EQH" : "EQL",
-        }),
-      );
-    }
+    // Leg OTE lines suppressed; shown via badges only
 
-    if (swings && overlays.oteBands && seriesRef.current) {
-      const lastHigh = [...swings].reverse().find((s) => s.type === "high");
-      const lastLow = [...swings].reverse().find((s) => s.type === "low");
-      if (lastHigh && lastLow) {
-        const legUp = lastHigh.time > lastLow.time;
-        const high = legUp ? lastHigh.price : Math.max(lastHigh.price, lastLow.price);
-        const low = legUp ? Math.min(lastHigh.price, lastLow.price) : lastLow.price;
-        const range = high - low;
-        if (range > 0) {
-          const ote62 = high - range * 0.62;
-          const ote705 = high - range * 0.705;
-          legOteLinesRef.current = [
-            seriesRef.current.createPriceLine({
-              price: ote62,
-              color: "#a78bfa",
-              lineStyle: LineStyle.Dotted,
-              lineWidth: 1,
-              title: "Leg OTE 62%",
-            }),
-            seriesRef.current.createPriceLine({
-              price: ote705,
-              color: "#c084fc",
-              lineStyle: LineStyle.Dotted,
-              lineWidth: 1,
-              title: "Leg OTE 70.5%",
-            }),
-          ];
-        }
-      }
-    }
-
-    if (overlays.signals && signals && seriesRef.current) {
-      const filtered =
-        selectedSetup === "all"
-          ? signals.slice(-5)
-          : signals.filter((s) => matchesSelectedSetup(s.setup)).slice(-5);
-      const newLines: IPriceLine[] = [];
-      filtered.forEach((s, idx) => {
-        if (s.stop) {
-          newLines.push(
-            seriesRef.current!.createPriceLine({
-              price: s.stop,
-              color: s.direction === "buy" ? "#f97316" : "#ef4444",
-              lineStyle: LineStyle.Solid,
-              lineWidth: 1,
-              axisLabelVisible: false,
-              title: `${s.setup ?? s.direction.toUpperCase()} SL ${idx + 1}`,
-            }),
-          );
-        }
-        if (s.tp1) {
-          newLines.push(
-            seriesRef.current!.createPriceLine({
-              price: s.tp1,
-              color: "#22c55e",
-              lineStyle: LineStyle.Dotted,
-              lineWidth: 1,
-              axisLabelVisible: false,
-              title: `${s.setup ?? "TP"} 1`,
-            }),
-          );
-        }
-        if (s.tp2) {
-          newLines.push(
-            seriesRef.current!.createPriceLine({
-              price: s.tp2,
-              color: "#16a34a",
-              lineStyle: LineStyle.Dotted,
-              lineWidth: 1,
-              axisLabelVisible: false,
-              title: `${s.setup ?? "TP"} 2`,
-            }),
-          );
-        }
-      });
-      slTpLinesRef.current = newLines;
-    }
+    // SL/TP price lines for signals are intentionally omitted to keep chart visuals clean; badges handle context
   }, [
     gaps,
     overlays.fvg,
@@ -2102,100 +2258,20 @@ export function ChartPanel({
   ]);
 
   useEffect(() => {
-    if (!seriesRef.current) return;
-    htfLinesRef.current.forEach((line) => seriesRef.current?.removePriceLine(line));
-    htfLinesRef.current = [];
-    if (!htfLevels) return;
-    const lines: IPriceLine[] = [];
-    if (htfLevels.prevDayHigh) {
-      lines.push(
-        seriesRef.current.createPriceLine({
-          price: htfLevels.prevDayHigh,
-          color: "#fcd34d",
-          lineStyle: LineStyle.Dashed,
-          lineWidth: 1,
-          title: "PDH",
-        }),
-      );
-    }
-    if (htfLevels.prevDayLow) {
-      lines.push(
-        seriesRef.current.createPriceLine({
-          price: htfLevels.prevDayLow,
-          color: "#f59e0b",
-          lineStyle: LineStyle.Dashed,
-          lineWidth: 1,
-          title: "PDL",
-        }),
-      );
-    }
-    if (htfLevels.prevWeekHigh) {
-      lines.push(
-        seriesRef.current.createPriceLine({
-          price: htfLevels.prevWeekHigh,
-          color: "#22d3ee",
-          lineStyle: LineStyle.Solid,
-          lineWidth: 1,
-          title: "PWH",
-        }),
-      );
-    }
-    if (htfLevels.prevWeekLow) {
-      lines.push(
-        seriesRef.current.createPriceLine({
-          price: htfLevels.prevWeekLow,
-          color: "#0ea5e9",
-          lineStyle: LineStyle.Solid,
-          lineWidth: 1,
-          title: "PWL",
-        }),
-      );
-    }
-    if (htfLevels.weekOpen) {
-      lines.push(
-        seriesRef.current.createPriceLine({
-          price: htfLevels.weekOpen,
-          color: "#a855f7",
-          lineStyle: LineStyle.Dotted,
-          lineWidth: 1,
-          title: "Week Open",
-        }),
-      );
-    }
-    if (htfLevels.monthOpen) {
-      lines.push(
-        seriesRef.current.createPriceLine({
-          price: htfLevels.monthOpen,
-          color: "#ef4444",
-          lineStyle: LineStyle.Dotted,
-          lineWidth: 1,
-          title: "Month Open",
-        }),
-      );
-    }
-    htfLinesRef.current = lines;
-  }, [htfLevels]);
+    // suppress HTF level price lines; info is surfaced via badges/overlays
+  }, [htfLevels, model2022]);
 
   useEffect(() => {
     if (!seriesRef.current) return;
     obZonesRef.current.forEach((line) => seriesRef.current?.removePriceLine(line));
     obZonesRef.current = [];
 
-    if (overlays.orderBlocks && orderBlocks) {
-      obZonesRef.current = orderBlocks.slice(-10).map((b) =>
-        seriesRef.current!.createPriceLine({
-          price: (b.high + b.low) / 2,
-          color: b.type === "bullish" ? "#10b981aa" : "#ef4444aa",
-          lineStyle: LineStyle.Dashed,
-          lineWidth: 2,
-          title: b.type === "bullish" ? "Bull OB" : "Bear OB",
-        }),
-      );
-    }
+    // order block price lines suppressed; boxes handle the visualization
   }, [orderBlocks, overlays.orderBlocks]);
 
   useEffect(() => {
-    if (!notificationsEnabled) {
+    const wantsAuto = Boolean(backtest?.autoTrade);
+    if (!notificationsEnabled && !wantsAuto) {
       setSignalPrompt(null);
       setSignalPromptScore(null);
       return;
@@ -2222,7 +2298,7 @@ export function ChartPanel({
       });
       setSignalPromptScore(evalResult.score);
       persistLastPromptedSignal(latest.time);
-      const shouldNotify = !backtest?.enabled && signalIsFresh;
+      const shouldNotify = notificationsEnabled && !backtest?.enabled && signalIsFresh;
       const shouldAutoTrade = Boolean(backtest?.autoTrade) && signalIsFresh;
       if (shouldNotify) {
         notifyAlertConnectors(latest, {
@@ -2381,6 +2457,30 @@ export function ChartPanel({
             </button>
           )}
         </div>
+        {overlays.pdZones && premiumDiscount && pdZones.length > 0 && (
+          <div className="pointer-events-none absolute inset-0 z-5">
+            {pdZones.map((zone) => (
+              <div
+                key={zone.id}
+                className="absolute rounded border border-transparent"
+                style={{
+                  left: `${zone.left}px`,
+                  width: `${zone.width}px`,
+                  top: `${zone.top}px`,
+                  height: `${zone.height}px`,
+                  background: zone.gradient ?? zone.color,
+                }}
+              >
+                <div
+                  className="absolute left-1 top-1 rounded px-1 py-0.5 text-[10px]"
+                  style={{ backgroundColor: "rgba(0,0,0,0.35)", color: zone.textColor ?? "#e5e7eb" }}
+                >
+                  {zone.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {overlays.sessions && sessionBands.length > 0 && (
           <div className="pointer-events-none absolute inset-0 z-10">
             {sessionBands.map((band) => (
@@ -2658,6 +2758,106 @@ export function ChartPanel({
     )}
     {drawingElements}
     {previewElement}
+        {overlays.signals && signalBoxes.length > 0 && (
+          <div className="pointer-events-none absolute inset-0 z-20">
+            {signalBoxes.map((box) => (
+              <div
+                key={box.id}
+                className="absolute rounded border shadow-sm shadow-black/30"
+                style={{
+                  left: `${box.left}px`,
+                  width: `${box.width}px`,
+                  top: `${box.top}px`,
+                  height: `${box.height}px`,
+                  background: box.gradient ?? box.color,
+                  borderColor: box.borderColor ?? box.color,
+                }}
+                title={box.label}
+              >
+                <div
+                  className="absolute left-1 top-1 rounded px-1 py-0.5 text-[10px] font-semibold"
+                  style={{ backgroundColor: "rgba(0,0,0,0.4)", color: box.textColor ?? "#f8fafc" }}
+                >
+                  {box.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {overlays.liquidity && structureSegments.length > 0 && (
+          <div className="pointer-events-none absolute inset-0 z-15">
+            {structureSegments.map((seg) => (
+              <div
+                key={seg.id}
+                className="absolute rounded"
+                style={{
+                  left: `${seg.left}px`,
+                  width: `${seg.width}px`,
+                  top: `${seg.top}px`,
+                  height: `${seg.height}px`,
+                  background: seg.color,
+                }}
+              >
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 translate-y-4 rounded px-1 py-[1px] text-[9px] font-semibold"
+                  style={{ color: seg.textColor ?? seg.color }}
+                >
+                  {seg.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {overlays.sweeps && eqSegments.length > 0 && (
+          <div className="pointer-events-none absolute inset-0 z-15">
+            {eqSegments.map((seg) => (
+              <div
+                key={seg.id}
+                className="absolute"
+                style={{
+                  left: `${seg.x1}px`,
+                  width: `${Math.max(6, seg.x2 - seg.x1)}px`,
+                  top: `${seg.y - 1}px`,
+                  height: "2px",
+                  background: seg.color,
+                }}
+              >
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 -translate-y-4 rounded px-1 py-[1px] text-[9px] font-semibold"
+                  style={{ color: seg.color }}
+                >
+                  {seg.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {overlays.fvg && model2022Boxes.length > 0 && (
+          <div className="pointer-events-none absolute inset-0 z-20">
+            {model2022Boxes.map((box) => (
+              <div
+                key={box.id}
+                className="absolute rounded border"
+                style={{
+                  left: `${box.left}px`,
+                  width: `${box.width}px`,
+                  top: `${box.top}px`,
+                  height: `${box.height}px`,
+                  background: box.gradient ?? box.color,
+                  borderColor: box.borderColor ?? box.color,
+                }}
+                title={box.label}
+              >
+                <div
+                  className="absolute left-1 top-1 rounded px-1 py-0.5 text-[10px]"
+                  style={{ backgroundColor: "rgba(0,0,0,0.55)", color: box.textColor ?? "#f8fafc" }}
+                >
+                  {box.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {overlays.fvg && fvgBoxes.length > 0 && (
           <div className="pointer-events-none absolute inset-0 z-10">
             {fvgBoxes.map((box) => (
@@ -2968,10 +3168,6 @@ function simulateTradeOutcome(
   return partialRealized
     ? { partialRealized, partialHit }
     : {};
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }
 
 function formatMeasureLabel(start: { price: number; time: number }, end: { price: number; time: number }) {

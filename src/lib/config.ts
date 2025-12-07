@@ -9,5 +9,5 @@ export const STOCK_SYMBOLS = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', '
 export const SESSION_ZONES: SessionZone[] = [
   { label: 'Asia', startHour: 0, endHour: 3, killStartHour: 0, killEndHour: 2 },
   { label: 'London', startHour: 7, endHour: 10, killStartHour: 7, killEndHour: 10 },
-  { label: 'New York', startHour: 12, endHour: 16, killStartHour: 13, killEndHour: 15 },
+  { label: 'New York', startHour: 12, endHour: 16, killStartHour: 12, killEndHour: 15 },
 ];

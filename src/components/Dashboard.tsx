@@ -6,24 +6,23 @@ import { ChartPanel } from './ChartPanel';
 import { TopBar } from './TopBar';
 import { BacktestControls } from './BacktestControls';
 import { InsightPanel } from './InsightPanel';
+import { InfoDrawer } from './InfoDrawer';
 import { useAppStore } from '@/state/useAppStore';
-import type { AssetClass, Candle } from '@/lib/types';
+import type { AssetClass, Candle, Signal, Model2022Signal } from '@/lib/types';
 import { useCandles } from '@/hooks/useCandles';
 import { SESSION_ZONES } from '@/lib/config';
+import { computeBias, detectStructureShifts, detectSwings } from '@/lib/strategies/structure';
 import {
-  computeBias,
   computePremiumDiscountRange,
-  detectBreakerBlocks,
   computeHtfLevels,
-  detectFVG,
-  detectEqualHighsLows,
-  detectOrderBlocks,
-  detectSignals,
-  detectStructureShifts,
   detectLiquiditySweeps,
-  detectSwings,
-} from '@/lib/ict';
+  detectEqualHighsLows,
+} from '@/lib/strategies/liquidity';
+import { detectOrderBlocks, detectBreakerBlocks } from '@/lib/strategies/blocks';
+import { detectFVG } from '@/lib/strategies/gaps';
+import { detectSignals } from '@/lib/strategies/signals';
 import { evaluateIctScanner } from '@/lib/ictScanner';
+import { buildModel2022State } from '@/lib/strategies/model2022';
 
 const EMPTY_CANDLES: Candle[] = [];
 
@@ -38,6 +37,7 @@ export function Dashboard() {
     selectedSetup,
     sidebarOpen,
     toggleSidebar,
+    infoOpen,
   } = useAppStore();
   const {
     candles = EMPTY_CANDLES,
@@ -64,9 +64,10 @@ export function Dashboard() {
   }, [backtest.enabled, backtest.cursor, candles]);
 
   const bias = useMemo(() => computeBias(scopedCandles), [scopedCandles]);
+  const needsStructure = overlays.liquidity || overlays.structureSegments;
   const swings = useMemo(
-    () => (overlays.liquidity ? detectSwings(scopedCandles, 2) : []),
-    [scopedCandles, overlays.liquidity],
+    () => (needsStructure ? detectSwings(scopedCandles, 2) : []),
+    [scopedCandles, needsStructure],
   );
   const gaps = useMemo(() => (overlays.fvg ? detectFVG(scopedCandles) : []), [scopedCandles, overlays.fvg]);
   const orderBlocks = useMemo(
@@ -79,10 +80,10 @@ export function Dashboard() {
   );
   const structureShifts = useMemo(
     () =>
-      overlays.liquidity
+      needsStructure
         ? detectStructureShifts(scopedCandles, swings, 0, structureShiftOptions)
         : [],
-    [scopedCandles, swings, overlays.liquidity, structureShiftOptions],
+    [scopedCandles, swings, needsStructure, structureShiftOptions],
   );
   const sweeps = useMemo(
     () => (overlays.sweeps ? detectLiquiditySweeps(scopedCandles) : []),
@@ -101,10 +102,24 @@ export function Dashboard() {
     [scopedCandles],
   );
   const htfLevels = useMemo(() => computeHtfLevels(scopedCandles), [scopedCandles]);
+  const model2022 = useMemo(
+    () =>
+      buildModel2022State({
+        candles: scopedCandles,
+        fullCandles: candles,
+        swings,
+        gaps,
+        orderBlocks,
+        bias,
+        structureShifts,
+      }),
+    [scopedCandles, candles, swings, gaps, orderBlocks, bias, structureShifts],
+  );
+  const model2022Signals = useMemo(() => mapModel2022Signals(model2022.m15Signals), [model2022.m15Signals]);
   const debugSignals = process.env.NEXT_PUBLIC_DEBUG_SIGNALS === 'true';
   const notificationSignals = useMemo(
-    () =>
-      detectSignals(
+    () => [
+      ...detectSignals(
         scopedCandles,
         bias,
         gaps,
@@ -118,6 +133,8 @@ export function Dashboard() {
         htfLevels,
         { uiSignalLimit: overlays.signals ? 25 : null, debug: debugSignals },
       ),
+      ...model2022Signals,
+    ],
     [
       scopedCandles,
       bias,
@@ -130,13 +147,22 @@ export function Dashboard() {
       htfLevels,
       overlays.signals,
       debugSignals,
+      model2022Signals,
     ],
   );
   const signals = overlays.signals ? notificationSignals : [];
   const fullBias = useMemo(() => computeBias(candles), [candles]);
+  const fullNeedsStructure = overlays.liquidity || overlays.structureSegments;
   const fullSwings = useMemo(
-    () => (overlays.liquidity ? detectSwings(candles, 2) : []),
-    [candles, overlays.liquidity],
+    () => (fullNeedsStructure ? detectSwings(candles, 2) : []),
+    [candles, fullNeedsStructure],
+  );
+  const fullStructureShifts = useMemo(
+    () =>
+      fullNeedsStructure
+        ? detectStructureShifts(candles, fullSwings, 0, structureShiftOptions)
+        : [],
+    [candles, fullSwings, fullNeedsStructure, structureShiftOptions],
   );
   const fullGaps = useMemo(() => (overlays.fvg ? detectFVG(candles) : []), [candles, overlays.fvg]);
   const fullOrderBlocks = useMemo(
@@ -153,9 +179,26 @@ export function Dashboard() {
   );
   const fullPremiumDiscount = useMemo(() => computePremiumDiscountRange(candles), [candles]);
   const fullHtfLevels = useMemo(() => computeHtfLevels(candles), [candles]);
-  const fullNotificationSignals = useMemo(
+  const fullModel2022 = useMemo(
     () =>
-      detectSignals(
+      buildModel2022State({
+        candles,
+        fullCandles: candles,
+        swings: fullSwings,
+        gaps: fullGaps,
+        orderBlocks: fullOrderBlocks,
+        bias: fullBias,
+        structureShifts: fullStructureShifts,
+      }),
+    [candles, fullSwings, fullGaps, fullOrderBlocks, fullBias, fullStructureShifts],
+  );
+  const fullModel2022Signals = useMemo(
+    () => mapModel2022Signals(fullModel2022.m15Signals),
+    [fullModel2022.m15Signals],
+  );
+  const fullNotificationSignals = useMemo(
+    () => [
+      ...detectSignals(
         candles,
         fullBias,
         fullGaps,
@@ -169,6 +212,8 @@ export function Dashboard() {
         fullHtfLevels,
         { uiSignalLimit: null, debug: debugSignals },
       ),
+      ...fullModel2022Signals,
+    ],
     [
       candles,
       fullBias,
@@ -180,11 +225,15 @@ export function Dashboard() {
       fullPremiumDiscount,
       fullHtfLevels,
       debugSignals,
+      fullModel2022Signals,
     ],
   );
   const latest = scopedCandles.at(-1);
   const prev = scopedCandles.at(-2);
   const latestPrice = latest?.c ?? null;
+  const latestOhlc = latest
+    ? { o: latest.o, h: latest.h, l: latest.l, c: latest.c }
+    : null;
   const priceChangeAbs = latest && prev ? latest.c - prev.c : null;
   const priceChangePct = priceChangeAbs && prev ? (priceChangeAbs / prev.c) * 100 : null;
   const marketOpen = isMarketOpen(assetClass);
@@ -197,36 +246,36 @@ export function Dashboard() {
 
   return (
     <div className="flex h-screen flex-col bg-zinc-950 text-white">
-      <TopBar symbol={symbol} timeframe={timeframe} bias={bias} />
+      <TopBar symbol={symbol} timeframe={timeframe} bias={bias} latestOhlc={latestOhlc} />
       <div className="relative flex flex-1 min-h-0 overflow-hidden">
         <div
-          className={`absolute top-0 bottom-0 left-0 z-30 w-72 transform transition-transform duration-200 ${
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
-        >
-          <ControlPanel />
-        </div>
-        <button
-          aria-label="Toggle sidebar"
           className={`
-            group absolute top-1/2 z-40 flex h-10 w-6 -translate-y-1/2 items-center justify-center
-            rounded-full border border-zinc-700 bg-zinc-900 text-zinc-300 shadow
-            transition hover:border-emerald-500 hover:text-emerald-200
+            absolute top-0 bottom-0 left-0 z-40 w-80 transform transition-transform duration-200
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           `}
-          style={{
-            left: sidebarOpen ? '17.5rem' : '0.5rem',
-          }}
-          onClick={() => toggleSidebar()}
         >
-          <span
-            className={`
-              text-xs font-semibold transition
-              ${sidebarOpen ? 'rotate-180' : ''}
-            `}
-          >
-            ❯
-          </span>
-        </button>
+          <div className="h-full bg-zinc-950/95 shadow-2xl shadow-black/60">
+            <ControlPanel />
+          </div>
+        </div>
+        <div
+          className={`
+            absolute top-0 bottom-0 right-0 z-40 w-80 transform transition-transform duration-200
+            ${infoOpen ? 'translate-x-0' : 'translate-x-full'}
+          `}
+        >
+          <div className="h-full bg-zinc-950/95 shadow-2xl shadow-black/60">
+            <InfoDrawer
+              source={source}
+              candlesCount={candles.length}
+              signalsCount={notificationSignals.length}
+              orderBlocksCount={orderBlocks.length}
+              gapsCount={gaps.length}
+              swingsCount={swings.length}
+              sweepsCount={sweeps.length}
+            />
+          </div>
+        </div>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {isLoading && (
             <div className="flex flex-1 items-center justify-center text-sm text-zinc-400">
@@ -273,6 +322,7 @@ export function Dashboard() {
                     selectedSetup={selectedSetup}
                     dataSource={source}
                     premiumDiscount={premiumDiscount}
+                    model2022={model2022}
                     bias={bias}
                     latestPrice={latestPrice}
                     notificationSignals={notificationSignals}
@@ -317,4 +367,29 @@ function isMarketOpen(assetClass: AssetClass) {
   if (day === 0 || day === 6) return false;
   const hour = now.getUTCHours() + now.getUTCMinutes() / 60;
   return hour >= 14.5 && hour <= 21;
+}
+
+function mapModel2022Signals(modelSignals: Model2022Signal[] = []): Signal[] {
+  return modelSignals.map((sig) => {
+    const gapTop = Math.max(sig.fvg.top, sig.fvg.bottom);
+    const gapBottom = Math.min(sig.fvg.top, sig.fvg.bottom);
+    const rawStop = sig.stop ?? (sig.direction === 'buy' ? gapBottom : gapTop);
+    const gapRisk = Math.abs(gapTop - gapBottom) || Math.abs(sig.entry) * 0.0008;
+    const minRisk = Math.max(Math.abs(sig.entry) * 0.0012, gapRisk * 0.5);
+    const risk = Math.max(Math.abs(sig.entry - rawStop), minRisk);
+    const stop = sig.direction === 'buy' ? sig.entry - risk : sig.entry + risk;
+    const tp1 = sig.direction === 'buy' ? sig.entry + risk * 2 : sig.entry - risk * 2;
+    const tp2 = sig.direction === 'buy' ? sig.entry + risk * 3 : sig.entry - risk * 3;
+    return {
+      time: sig.time,
+      price: sig.entry,
+      direction: sig.direction,
+      setup: 'Model 2022 M15 FVG',
+      stop,
+      tp1,
+      tp2,
+      basis: sig.basis.join(' • '),
+      session: 'New York',
+    };
+  });
 }

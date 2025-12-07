@@ -40,29 +40,48 @@ type Props = {
   symbol: string;
   timeframe: Timeframe;
   bias?: Bias;
+  latestOhlc?: { o: number; h: number; l: number; c: number } | null;
 };
 
-export function TopBar({ symbol, timeframe, bias }: Props) {
-  const { assetClass, setAssetClass, setSymbol, sidebarOpen, toggleSidebar } = useAppStore();
+export function TopBar({ symbol, timeframe, bias, latestOhlc }: Props) {
+  const { assetClass, setAssetClass, setSymbol, toggleSidebar, toggleInfo } = useAppStore();
   const biasColor =
     bias?.label === 'Bullish' ? 'text-emerald-400' : bias?.label === 'Bearish' ? 'text-red-400' : 'text-zinc-200';
   const symbols = assetClass === 'crypto' ? CRYPTO_SYMBOLS : assetClass === 'forex' ? FOREX_SYMBOLS : STOCK_SYMBOLS;
 
+  const formatOhlc = (val: number) => {
+    const abs = Math.abs(val);
+    if (abs >= 1000) return val.toFixed(2);
+    if (abs >= 1) return val.toFixed(2);
+    if (abs >= 0.01) return val.toFixed(4);
+    return val.toFixed(6);
+  };
+
   return (
     <header className="flex flex-col gap-2 border-b border-zinc-800 bg-zinc-950/70 px-4 py-3">
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs uppercase text-zinc-400">ICT Trading Desk</p>
-          <p className="text-lg font-semibold text-white tracking-tight">
-            {symbol} <span className="text-zinc-500">/</span> {timeframe}
-          </p>
+        <div className="flex items-center gap-3">
+          <button
+            className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-200 transition hover:border-emerald-600 hover:text-emerald-200"
+            onClick={() => toggleSidebar()}
+            title="Layers & Controls"
+          >
+            ☰ Layers
+          </button>
+          <button
+            className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-200 transition hover:border-sky-500 hover:text-sky-200"
+            onClick={() => toggleInfo()}
+            title="Info dashboard"
+          >
+            ℹ Info
+          </button>
+          <div>
+            <p className="text-xs uppercase text-zinc-400">ICT Trading Desk</p>
+            <p className="text-lg font-semibold text-white tracking-tight">
+              {symbol} <span className="text-zinc-500">/</span> {timeframe}
+            </p>
+          </div>
         </div>
-        <button
-          className="hidden rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 transition hover:border-zinc-700 sm:inline-flex"
-          onClick={() => useAppStore.getState().toggleSidebar()}
-        >
-          Toggle Sidebar
-        </button>
         <div className="hidden items-center gap-2 rounded border border-zinc-800 bg-zinc-900/80 px-2 py-1 text-xs text-zinc-200 sm:flex">
           {MARKET_OPTIONS.map((opt) => (
             <button
@@ -95,6 +114,14 @@ export function TopBar({ symbol, timeframe, bias }: Props) {
           <p className={clsx('text-base font-semibold', biasColor)}>
             {bias?.label ?? 'Neutral'} {bias?.reason ? <span className="text-xs text-zinc-500">({bias.reason})</span> : null}
           </p>
+          {latestOhlc && (
+            <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-[2px] text-[11px] text-zinc-300">
+              <span>O <span className="text-sky-200">{formatOhlc(latestOhlc.o)}</span></span>
+              <span>H <span className="text-emerald-200">{formatOhlc(latestOhlc.h)}</span></span>
+              <span>L <span className="text-rose-200">{formatOhlc(latestOhlc.l)}</span></span>
+              <span>C <span className="text-amber-200">{formatOhlc(latestOhlc.c)}</span></span>
+            </div>
+          )}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">

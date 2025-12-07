@@ -20,10 +20,21 @@ export function ControlPanel() {
     notificationsEnabled,
     toggleNotifications,
     clearTrades,
+    toggleSidebar,
   } = useAppStore();
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col gap-4 border-r border-zinc-800 bg-zinc-950/60 p-4 text-sm text-zinc-200">
+    <div className="flex w-80 flex-col gap-4 rounded-xl border border-zinc-800 bg-zinc-950/90 p-4 text-sm text-zinc-200 shadow-2xl shadow-black/50">
+      <div className="flex items-center justify-between">
+        <p className="text-xs uppercase tracking-wide text-zinc-400">Chart Layers</p>
+        <button
+          className="rounded px-2 py-1 text-xs text-zinc-300 transition hover:text-emerald-200"
+          onClick={() => toggleSidebar()}
+          aria-label="Close layers"
+        >
+          ✕
+        </button>
+      </div>
       <section>
         <p className="mb-1 text-xs uppercase text-zinc-500">Timeframe</p>
         <div className="flex flex-wrap gap-2">
@@ -109,6 +120,7 @@ export function ControlPanel() {
             <option value="Judas Swing">Judas Swing</option>
             <option value="Liquidity Void Return">Liquidity Void Return</option>
             <option value="Asian Range Breakout">Asian Range Breakout</option>
+            <option value="Model 2022 M15 FVG">Model 2022 (M15 FVG)</option>
             <optgroup label="Advanced ICT">
               <option value="advanced">Advanced ICT (All)</option>
               <option value="Silver Bullet">Silver Bullet</option>
@@ -193,7 +205,7 @@ export function ControlPanel() {
           </div>
         </div>
       </section>
-    </aside>
+    </div>
   );
 }
 
@@ -226,10 +238,16 @@ function labelFor(key: string) {
       return 'Breaker Blocks';
     case 'oteBands':
       return 'OTE Bands';
+    case 'pdZones':
+      return 'Premium/Discount Zones';
     case 'inversionFvgSignals':
       return 'Inversion FVG signals';
     case 'tradeMarkers':
       return 'Trade markers';
+    case 'structureSegments':
+      return 'BOS/CHoCH segments';
+    case 'eqConnectors':
+      return 'EQH/EQL connectors';
     default:
       return key;
   }
