@@ -44,9 +44,15 @@ type Props = {
 };
 
 export function TopBar({ symbol, timeframe, bias, latestOhlc }: Props) {
-  const { assetClass, setAssetClass, setSymbol, toggleSidebar, toggleInfo } = useAppStore();
+  const { assetClass, setAssetClass, setSymbol, toggleInfo } = useAppStore();
   const biasColor =
     bias?.label === 'Bullish' ? 'text-emerald-400' : bias?.label === 'Bearish' ? 'text-red-400' : 'text-zinc-200';
+  const biasChipClass =
+    bias?.label === 'Bullish'
+      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+      : bias?.label === 'Bearish'
+        ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+        : 'border-zinc-700 bg-zinc-900 text-zinc-300';
   const symbols = assetClass === 'crypto' ? CRYPTO_SYMBOLS : assetClass === 'forex' ? FOREX_SYMBOLS : STOCK_SYMBOLS;
 
   const formatOhlc = (val: number) => {
@@ -58,49 +64,39 @@ export function TopBar({ symbol, timeframe, bias, latestOhlc }: Props) {
   };
 
   return (
-    <header className="flex flex-col gap-2 border-b border-zinc-800 bg-zinc-950/70 px-4 py-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-200 transition hover:border-emerald-600 hover:text-emerald-200"
-            onClick={() => toggleSidebar()}
-            title="Layers & Controls"
-          >
-            ☰ Layers
-          </button>
-          <button
-            className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-200 transition hover:border-sky-500 hover:text-sky-200"
-            onClick={() => toggleInfo()}
-            title="Info dashboard"
-          >
-            ℹ Info
-          </button>
-          <div>
-            <p className="text-xs uppercase text-zinc-400">ICT Trading Desk</p>
-            <p className="text-lg font-semibold text-white tracking-tight">
-              {symbol} <span className="text-zinc-500">/</span> {timeframe}
+    <header className="border-b border-zinc-800 bg-zinc-950/70 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/80 shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
+            <Image
+              src="/ict-trading-desk-logo.png"
+              alt="ICT Trading Desk logo"
+              width={1254}
+              height={1254}
+              className="h-full w-full object-cover object-top"
+              priority
+            />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold tracking-tight text-white">
+                {symbol}
+              </p>
+              <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-300">
+                {timeframe}
+              </span>
+            </div>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+              ICT Trading Desk
             </p>
           </div>
         </div>
-        <div className="hidden items-center gap-2 rounded border border-zinc-800 bg-zinc-900/80 px-2 py-1 text-xs text-zinc-200 sm:flex">
-          {MARKET_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              className={clsx(
-                'rounded px-2 py-1 transition',
-                assetClass === opt.id ? 'bg-emerald-500/20 text-emerald-200' : 'hover:bg-zinc-800',
-              )}
-              onClick={() => setAssetClass(opt.id)}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-3 sm:hidden">
+        <div className="ml-auto flex flex-1 flex-wrap items-center justify-end gap-2">
           <select
-            className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-white"
+            className="min-w-[7.5rem] rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] font-semibold text-white"
             value={assetClass}
             onChange={(e) => setAssetClass(e.target.value as AssetClass)}
+            aria-label="Asset class"
           >
             {MARKET_OPTIONS.map((opt) => (
               <option key={opt.id} value={opt.id}>
@@ -108,28 +104,39 @@ export function TopBar({ symbol, timeframe, bias, latestOhlc }: Props) {
               </option>
             ))}
           </select>
-        </div>
-        <div className="text-right">
-          <p className="text-xs uppercase text-zinc-400">Daily Bias</p>
-          <p className={clsx('text-base font-semibold', biasColor)}>
-            {bias?.label ?? 'Neutral'} {bias?.reason ? <span className="text-xs text-zinc-500">({bias.reason})</span> : null}
-          </p>
           {latestOhlc && (
-            <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-[2px] text-[11px] text-zinc-300">
+            <div className="hidden items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/70 px-2.5 py-1 text-[10px] text-zinc-300 lg:flex">
               <span>O <span className="text-sky-200">{formatOhlc(latestOhlc.o)}</span></span>
               <span>H <span className="text-emerald-200">{formatOhlc(latestOhlc.h)}</span></span>
               <span>L <span className="text-rose-200">{formatOhlc(latestOhlc.l)}</span></span>
               <span>C <span className="text-amber-200">{formatOhlc(latestOhlc.c)}</span></span>
             </div>
           )}
+          <div
+            className={clsx(
+              'max-w-[12rem] truncate rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide',
+              biasChipClass,
+            )}
+            title={bias?.reason ?? undefined}
+          >
+            <span className={biasColor}>{bias?.label ?? 'Neutral'}</span>
+          </div>
+          <button
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-[12px] font-semibold text-zinc-200 transition hover:border-sky-500 hover:text-sky-200"
+            onClick={() => toggleInfo()}
+            title="Info dashboard"
+            aria-label="Info dashboard"
+          >
+            ℹ
+          </button>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1 text-xs [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {symbols.map((s) => (
           <button
             key={s}
             className={clsx(
-              'flex items-center gap-2 rounded border px-3 py-1 text-xs font-semibold transition',
+              'flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition',
               symbol === s
                 ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-200'
                 : 'border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700',
@@ -140,11 +147,11 @@ export function TopBar({ symbol, timeframe, bias, latestOhlc }: Props) {
               <Image
                 src={SYMBOL_LOGOS[s]!}
                 alt={s}
-                width={20}
-                height={20}
-                className="h-5 w-5 rounded-full bg-white/10 object-contain"
+                width={14}
+                height={14}
+                className="h-[14px] w-[14px] rounded-full bg-white/10 object-contain"
                 loading="lazy"
-                sizes="20px"
+                sizes="14px"
               />
             ) : (
               <span>•</span>
