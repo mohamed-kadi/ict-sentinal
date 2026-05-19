@@ -200,6 +200,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'ict-app-store',
+      skipHydration: true,
       partialize: (state) => ({
         assetClass: state.assetClass,
         symbol: state.symbol,

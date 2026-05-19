@@ -30,10 +30,11 @@ import {
   Model2022State,
 } from "@/lib/types";
 import { SESSION_ZONES } from "@/lib/config";
-import { classifySession } from "@/lib/ict";
+import { classifySession } from "@/lib/sessions";
 import { notifyAlertConnectors } from "@/lib/alertConnectors";
 import { CLOCK_OPTIONS, formatWithTz, getClockLabel } from "@/lib/time";
 import { evaluateIctScanner } from "@/lib/ictScanner";
+import { postTradeJournalEntry } from "@/lib/tradePerformance";
 import { useAppStore, type BacktestState, type BacktestTrade } from "@/state/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import { clamp } from "@/lib/utils";
@@ -52,6 +53,17 @@ const TIME_LABEL_FORMAT: Intl.DateTimeFormatOptions = {
   minute: "2-digit",
   second: "2-digit",
 };
+const DRAWING_TOOLBAR_TOOLS = [
+  { mode: "none" as const, label: "Exit", shortLabel: "✕", title: "Exit drawing mode" },
+  { mode: "hline" as const, label: "H-Line", shortLabel: "H", title: "Horizontal line" },
+  { mode: "trend" as const, label: "Trend", shortLabel: "/", title: "Trend line" },
+  { mode: "rect" as const, label: "Zone", shortLabel: "▭", title: "Rectangle" },
+  { mode: "fibo" as const, label: "Fib", shortLabel: "Fib", title: "Fibonacci retracement" },
+  { mode: "measure" as const, label: "Measure", shortLabel: "R", title: "Ruler / measurement" },
+  { mode: "long" as const, label: "Long", shortLabel: "Long", title: "Long position" },
+  { mode: "short" as const, label: "Short", shortLabel: "Short", title: "Short position" },
+];
+const LAYERS_SIDEBAR_WIDTH = 320;
 
 function timeframeToMs(tf?: Timeframe) {
   switch (tf) {
@@ -110,6 +122,7 @@ type Props = {
     | "sweeps"
     | "breakers"
     | "oteBands"
+    | "pdZones"
     | "inversionFvgSignals"
     | "tradeMarkers"
     | "structureSegments"
@@ -169,6 +182,7 @@ export function ChartPanel({
     setClockTz: updateClockTz,
     notificationsEnabled,
     optimizerEnabled,
+    sidebarOpen,
     addTrade,
     trades,
     updateTrade,
@@ -186,6 +200,7 @@ export function ChartPanel({
       setClockTz: state.setClockTz,
       notificationsEnabled: state.notificationsEnabled,
       optimizerEnabled: state.optimizerEnabled,
+      sidebarOpen: state.sidebarOpen,
       addTrade: state.addTrade,
       trades: state.backtest.trades,
       updateTrade: state.updateTrade,
@@ -200,10 +215,6 @@ export function ChartPanel({
   clockTzRef.current = clockTz;
   const [hoverTzTime, setHoverTzTime] = useState<string | null>(null);
   const [lastTzTime, setLastTzTime] = useState<string | null>(null);
-  const [liveClock, setLiveClock] = useState<string>(() => formatWithTz(new Date(), clockTz));
-  const [liveDate, setLiveDate] = useState<string>(() =>
-    formatWithTz(new Date(), clockTz, { weekday: "short", month: "short", day: "numeric" }),
-  );
   const [timelineTicks, setTimelineTicks] = useState<{ label: string; position: number }[]>([]);
   type SessionShade = {
     id: string;
@@ -554,6 +565,7 @@ export function ChartPanel({
   }, [setupStats]);
   const logTradeOutcome = useCallback((trade: BacktestTrade) => {
     if (typeof window === "undefined") return;
+    if (!symbol || !timeframe) return;
     if (!trade.setup) return;
     if (trade.result !== "win" && trade.result !== "loss") return;
     const size = trade.positionSize ?? 1;
@@ -566,18 +578,31 @@ export function ChartPanel({
         : trade.result === "win"
           ? 1
           : -1);
-    fetch("/api/trade-memory", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        setup: trade.setup,
-        session: trade.sessionLabel ?? "Unknown",
-        bias: trade.biasLabel ?? "Neutral",
-        result: trade.result,
-        rMultiple: Number.isFinite(computedR) ? computedR : trade.result === "win" ? 1 : -1,
-      }),
+    const exitPrice =
+      pnlPerUnit != null
+        ? trade.direction === "buy"
+          ? trade.entry + pnlPerUnit
+          : trade.entry - pnlPerUnit
+        : trade.result === "win"
+          ? trade.target
+          : trade.stop;
+    postTradeJournalEntry({
+      symbol,
+      timeframe,
+      setup: trade.setup,
+      session: trade.sessionLabel ?? "Unknown",
+      bias: trade.biasLabel ?? "Neutral",
+      direction: trade.direction,
+      result: trade.result,
+      rMultiple: Number.isFinite(computedR) ? computedR : trade.result === "win" ? 1 : -1,
+      entryPrice: trade.entry,
+      exitPrice,
+      stopPrice: trade.stop,
+      takeProfitPrice: trade.target,
+      executedAt: trade.openTime ?? trade.exitTime ?? Date.now(),
+      closedAt: trade.exitTime ?? Date.now(),
     }).catch(() => {});
-  }, []);
+  }, [symbol, timeframe]);
   useEffect(() => {
     setPendingPoints([]);
     setPreviewPoint(null);
@@ -860,6 +885,7 @@ export function ChartPanel({
     {
       points: number;
       dragPreview: boolean;
+      autoTargetR?: number;
     }
   > = {
     hline: { points: 1, dragPreview: false },
@@ -867,8 +893,42 @@ export function ChartPanel({
     rect: { points: 2, dragPreview: true },
     fibo: { points: 2, dragPreview: true },
     measure: { points: 2, dragPreview: true },
-    long: { points: 3, dragPreview: false },
-    short: { points: 3, dragPreview: false },
+    long: { points: 2, dragPreview: true, autoTargetR: 2 },
+    short: { points: 2, dragPreview: true, autoTargetR: 2 },
+  };
+
+  const buildDrawingPoints = (
+    type: DrawingType,
+    points: { time: number; price: number }[],
+    preview = false,
+  ) => {
+    const config = TOOL_CONFIG[type];
+    const normalized = points.slice(0, config.points);
+    if ((type !== "long" && type !== "short") || normalized.length < 2) {
+      return normalized;
+    }
+
+    const [entry, stop] = normalized;
+    if (!entry || !stop) {
+      return normalized;
+    }
+
+    const risk = Math.abs(entry.price - stop.price);
+    if (risk <= Number.EPSILON) {
+      return normalized;
+    }
+
+    const rewardMultiple = config.autoTargetR ?? 2;
+    const direction = type === "long" ? 1 : -1;
+    const target = {
+      time: Math.max(entry.time, stop.time),
+      price: entry.price + risk * rewardMultiple * direction,
+    };
+
+    if (preview) {
+      return [entry, stop, target];
+    }
+    return [entry, stop, target];
   };
 
   const timeToXCoord = (ms: number) => {
@@ -887,7 +947,7 @@ export function ChartPanel({
     addDrawing({
       id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type,
-      points: points.slice(0, TOOL_CONFIG[type].points),
+      points: buildDrawingPoints(type, points),
       color: DRAW_COLORS[type],
     });
   };
@@ -926,8 +986,8 @@ export function ChartPanel({
   const getPointFromPointerEvent = (evt: React.PointerEvent<HTMLDivElement>) => {
     if (!chartRef.current || !seriesRef.current || !containerRef.current) return null;
     const rect = containerRef.current.getBoundingClientRect();
-    const x = evt.clientX - rect.left;
-    const y = evt.clientY - rect.top;
+    const x = clamp(evt.clientX - rect.left, 0, rect.width);
+    const y = clamp(evt.clientY - rect.top, 0, rect.height);
     const time = chartRef.current.timeScale().coordinateToTime(x);
     const ms = convertCoordTime(time ?? null);
     const price = seriesRef.current.coordinateToPrice(y);
@@ -1056,6 +1116,23 @@ export function ChartPanel({
       return;
     }
     if (!isPointerDown) return;
+    evt.preventDefault();
+    cancelPointerDrawing(evt.currentTarget);
+  };
+
+  const handlePointerLeave = (evt: React.PointerEvent<HTMLDivElement>) => {
+    if (panMode) {
+      return;
+    }
+    if (!isPointerDown) {
+      if (pendingPoints.length === 0) {
+        setPreviewPoint(null);
+      }
+      return;
+    }
+    if (pointerIdRef.current != null) {
+      return;
+    }
     evt.preventDefault();
     cancelPointerDrawing(evt.currentTarget);
   };
@@ -1310,7 +1387,11 @@ export function ChartPanel({
         id: "preview",
         type: drawingMode,
         color: DRAW_COLORS[drawingMode],
-        points: [...pendingPoints.slice(0, config.points - 1), previewPoint],
+        points: buildDrawingPoints(
+          drawingMode,
+          [...pendingPoints.slice(0, config.points - 1), previewPoint],
+          true,
+        ),
       } as Drawing;
     }
     if (!previewPoint) return null;
@@ -1319,112 +1400,147 @@ export function ChartPanel({
       id: "preview",
       type: drawingMode,
       color: DRAW_COLORS[drawingMode],
-      points: [...pendingPoints, previewPoint].slice(0, config.points),
+      points: buildDrawingPoints(drawingMode, [...pendingPoints, previewPoint].slice(0, config.points), true),
     } as Drawing;
   })();
 
   const previewElement = previewDrawing ? renderDrawingShape(previewDrawing, "preview", { preview: true }) : null;
+  const drawingHint = panMode
+    ? "Pan mode on. Drag the chart to move around."
+    : drawingMode === "none"
+      ? "Choose a drawing tool. Drag tools draw on click-and-drag."
+      : drawingMode === "hline"
+        ? "Click once on the chart to place a horizontal level."
+        : drawingMode === "long" || drawingMode === "short"
+          ? "Click and drag to set entry and stop. Target is previewed automatically."
+          : "Click and drag on the chart. Press Esc to cancel the active tool.";
+  const toolbarShift = sidebarOpen ? LAYERS_SIDEBAR_WIDTH / 2 : 0;
+
+  useEffect(() => {
+    if (drawingMode === "none" && !panMode && pendingPoints.length === 0 && !isPointerDown) return;
+    const handleEscape = (evt: KeyboardEvent) => {
+      if (evt.key !== "Escape") return;
+      resetDrawingState();
+      setDrawingMode("none");
+      setPanMode(false);
+      setIsPanning(false);
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [drawingMode, panMode, pendingPoints.length, isPointerDown, setDrawingMode]);
 
   useEffect(() => {
     if (!containerRef.current || chartRef.current) return;
 
     let mounted = true;
-    import("lightweight-charts")
-      .then((lwc) => {
-        if (!mounted || !containerRef.current) return;
-        const createChart = (lwc as any).createChart ?? (lwc as any).default?.createChart;
-        const ColorType = (lwc as any).ColorType ?? (lwc as any).default?.ColorType;
-        const createSeriesMarkers =
-          (lwc as any).createSeriesMarkers ?? (lwc as any).default?.createSeriesMarkers;
-        if (!createChart || !ColorType) {
-          console.error("lightweight-charts exports missing createChart/ColorType");
-          return;
-        }
-        const chart = createChart(containerRef.current, {
-          layout: { background: { type: ColorType.Solid, color: "#0b0b0f" }, textColor: "#d1d5db" },
-          rightPriceScale: { borderColor: "#1f2937" },
-          timeScale: {
-            borderColor: "#1f2937",
-            timeVisible: true,
-            secondsVisible: false,
-            visible: true,
-            tickMarkFormatter: (t: Time) => formatTimeTick(t, true, clockTzRef.current),
-          },
-          grid: {
-            vertLines: { color: "#111827" },
-            horzLines: { color: "#111827" },
-          },
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        });
+    let chart: IChartApi | null = null;
+    let series: ISeriesApi<"Candlestick"> | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+    let markersPlugin: ISeriesMarkersPluginApi<UTCTimestamp> | null = null;
 
-        const CandlestickSeries =
-          (lwc as any).CandlestickSeries ?? (lwc as any).default?.CandlestickSeries;
-        const chartAny = chart as any;
+    const initChart = async () => {
+      const lwc = await import("lightweight-charts");
+      if (!mounted || !containerRef.current || chartRef.current) return;
 
-        const seriesOptions = {
-          upColor: "#34d399",
-          wickUpColor: "#34d399",
-          downColor: "#f87171",
-          wickDownColor: "#f87171",
-        };
+      const createChart = (lwc as any).createChart ?? (lwc as any).default?.createChart;
+      const ColorType = (lwc as any).ColorType ?? (lwc as any).default?.ColorType;
+      const createSeriesMarkers =
+        (lwc as any).createSeriesMarkers ?? (lwc as any).default?.createSeriesMarkers;
+      if (!createChart || !ColorType) {
+        console.error("lightweight-charts exports missing createChart/ColorType");
+        return;
+      }
+      const chartInstance = createChart(containerRef.current, {
+        layout: { background: { type: ColorType.Solid, color: "#0b0b0f" }, textColor: "#d1d5db" },
+        rightPriceScale: { borderColor: "#1f2937" },
+        timeScale: {
+          borderColor: "#1f2937",
+          timeVisible: true,
+          secondsVisible: false,
+          visible: true,
+          tickMarkFormatter: (t: Time) => formatTimeTick(t, true, clockTzRef.current),
+        },
+        grid: {
+          vertLines: { color: "#111827" },
+          horzLines: { color: "#111827" },
+        },
+        width: containerRef.current.clientWidth,
+        height: containerRef.current.clientHeight,
+      });
+      chart = chartInstance;
 
-        const series: ISeriesApi<"Candlestick"> | undefined =
-          typeof chartAny.addCandlestickSeries === "function"
-            ? chartAny.addCandlestickSeries(seriesOptions)
-            : typeof chartAny.addSeries === "function" && CandlestickSeries
-              ? chartAny.addSeries(CandlestickSeries, seriesOptions)
-              : undefined;
+      const CandlestickSeries =
+        (lwc as any).CandlestickSeries ?? (lwc as any).default?.CandlestickSeries;
+      const chartAny = chartInstance as any;
 
-        if (!series) {
-          console.error("addCandlestickSeries missing on chart", chart);
-          return;
-        }
+      const seriesOptions = {
+        upColor: "#34d399",
+        wickUpColor: "#34d399",
+        downColor: "#f87171",
+        wickDownColor: "#f87171",
+      };
 
-        chartRef.current = chart;
-        seriesRef.current = series;
-        markersPluginRef.current = createSeriesMarkers
-          ? createSeriesMarkers(series, [])
-          : null;
-        setMarkersPluginReady((v) => v + 1);
+      series =
+        typeof chartAny.addCandlestickSeries === "function"
+          ? chartAny.addCandlestickSeries(seriesOptions)
+          : typeof chartAny.addSeries === "function" && CandlestickSeries
+            ? chartAny.addSeries(CandlestickSeries, seriesOptions)
+            : null;
 
-        const initialCandles = candlesSnapshotRef.current;
-        if (initialCandles.length > 0) {
-          series.setData(
-            initialCandles.map((c) => ({
-              time: (c.t / 1000) as UTCTimestamp,
-              open: c.o,
-              high: c.h,
-              low: c.l,
-              close: c.c,
-            })),
-          );
-          chart.timeScale().fitContent();
-        }
+      if (!series) {
+        console.error("addCandlestickSeries missing on chart", chart);
+        chartInstance.remove();
+        chart = null;
+        return;
+      }
 
-        const resizeObserver = new ResizeObserver((entries) => {
-          const { width, height } = entries[0].contentRect;
-          setChartWidth(width);
-          setChartHeight(height);
-          chart.applyOptions({ width, height });
-        });
-        resizeObserver.observe(containerRef.current as Element);
+      chartRef.current = chart;
+      seriesRef.current = series;
+      markersPlugin = createSeriesMarkers ? createSeriesMarkers(series, []) : null;
+      markersPluginRef.current = markersPlugin;
+      setMarkersPluginReady((v) => v + 1);
 
-        return () => {
-          markersPluginRef.current?.detach();
-          markersPluginRef.current = null;
-          resizeObserver.disconnect();
-          chart.remove();
-          chartRef.current = null;
-          seriesRef.current = null;
-        };
-      })
-      .catch((err) => console.error("Failed to init chart", err));
+      const initialCandles = candlesSnapshotRef.current;
+      if (initialCandles.length > 0) {
+        series.setData(
+          initialCandles.map((c) => ({
+            time: (c.t / 1000) as UTCTimestamp,
+            open: c.o,
+            high: c.h,
+            low: c.l,
+            close: c.c,
+          })),
+        );
+        chartInstance.timeScale().fitContent();
+      }
+
+      resizeObserver = new ResizeObserver((entries) => {
+        const { width, height } = entries[0].contentRect;
+        setChartWidth((prev) => (prev === width ? prev : width));
+        setChartHeight((prev) => (prev === height ? prev : height));
+        chart?.applyOptions({ width, height });
+      });
+      resizeObserver.observe(containerRef.current);
+    };
+
+    initChart().catch((err) => console.error("Failed to init chart", err));
 
     return () => {
       mounted = false;
+      markersPlugin?.detach();
+      if (markersPluginRef.current === markersPlugin) {
+        markersPluginRef.current = null;
+      }
+      resizeObserver?.disconnect();
+      chart?.remove();
+      if (chartRef.current === chart) {
+        chartRef.current = null;
+      }
+      if (seriesRef.current === series) {
+        seriesRef.current = null;
+      }
     };
-  }, [candles.length]);
+  }, []);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -2206,17 +2322,6 @@ export function ChartPanel({
   }, [markersPluginReady, clockTz, convertCoordTime]);
 
   useEffect(() => {
-    const updateClock = () => {
-      const now = new Date();
-      setLiveClock(formatWithTz(now, clockTz));
-      setLiveDate(formatWithTz(now, clockTz, { weekday: "short", month: "short", day: "numeric" }));
-    };
-    updateClock();
-    const id = setInterval(updateClock, 1000);
-    return () => clearInterval(id);
-  }, [clockTz]);
-
-  useEffect(() => {
     if (!seriesRef.current) return;
 
     gapZonesRef.current.forEach((line) => seriesRef.current?.removePriceLine(line));
@@ -2386,6 +2491,56 @@ export function ChartPanel({
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
+      <div className="shrink-0 border-b border-white/10 bg-[#060b18]/90 px-3 py-2">
+        <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div
+            className="mx-auto flex min-w-max flex-col items-center gap-2 transition-transform duration-200"
+            style={{ transform: `translateX(${toolbarShift}px)` }}
+          >
+            <div className="flex flex-wrap items-center justify-center gap-2 rounded-full border border-white/10 bg-[#0b1220]/95 px-2 py-1 shadow-[0_14px_34px_rgba(0,0,0,0.35)]">
+              <button
+                className={clsx(
+                  "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
+                  panMode
+                    ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-200"
+                    : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700",
+                )}
+                onClick={togglePanMode}
+                title="Pan chart"
+              >
+                ✋ Pan
+              </button>
+              {DRAWING_TOOLBAR_TOOLS.map((tool) => (
+                <button
+                  key={tool.mode}
+                  className={clsx(
+                    "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
+                    drawingMode === tool.mode
+                      ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-200"
+                      : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700",
+                  )}
+                  onClick={() => setDrawingMode(drawingMode === tool.mode ? "none" : tool.mode)}
+                  title={tool.title}
+                >
+                  <span className="hidden sm:inline">{tool.label}</span>
+                  <span className="sm:hidden">{tool.shortLabel}</span>
+                </button>
+              ))}
+              {drawings.length > 0 && (
+                <button
+                  className="rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] font-semibold text-zinc-300 transition hover:border-rose-500/50 hover:text-rose-200"
+                  onClick={clearDrawings}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="text-center text-[10px] text-zinc-400">
+              {drawingHint}
+            </div>
+          </div>
+        </div>
+      </div>
       <div
         className="relative flex-1 min-h-0 overflow-hidden"
         style={{ cursor: panelCursor }}
@@ -2408,55 +2563,14 @@ export function ChartPanel({
           style={{
             pointerEvents: overlayActive || manualTradePrompt ? "auto" : "none",
             cursor: overlayCursor,
+            touchAction: overlayActive ? "none" : "auto",
           }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerCancel}
+          onPointerLeave={handlePointerLeave}
           onPointerCancel={handlePointerCancel}
         />
-        <div className="pointer-events-auto absolute top-3 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center gap-2 rounded bg-black/70 px-3 py-2 text-[11px] text-zinc-200 shadow-lg shadow-black/40">
-          <button
-            className={clsx(
-              "rounded px-2 py-1 transition",
-              panMode ? "bg-emerald-500/30 text-emerald-200" : "bg-zinc-900/80 hover:bg-zinc-800",
-            )}
-            onClick={togglePanMode}
-            title="Pan chart"
-          >
-            ✋
-          </button>
-          {[
-            { mode: "none" as const, label: "✕", title: "Exit drawing mode" },
-            { mode: "hline" as const, label: "H", title: "Horizontal line" },
-            { mode: "trend" as const, label: "/", title: "Trend line" },
-            { mode: "rect" as const, label: "▭", title: "Rectangle" },
-            { mode: "fibo" as const, label: "Fib", title: "Fibonacci retracement" },
-            { mode: "measure" as const, label: "R", title: "Ruler / measurement" },
-            { mode: "long" as const, label: "Long", title: "Long position" },
-            { mode: "short" as const, label: "Short", title: "Short position" },
-          ].map((tool) => (
-            <button
-              key={tool.mode}
-              className={clsx(
-                "rounded px-2 py-1 transition",
-                drawingMode === tool.mode ? "bg-emerald-500/30 text-emerald-200" : "bg-zinc-900/80 hover:bg-zinc-800",
-              )}
-              onClick={() => setDrawingMode(drawingMode === tool.mode ? "none" : tool.mode)}
-              title={tool.title}
-            >
-              {tool.label}
-            </button>
-          ))}
-          {drawings.length > 0 && (
-            <button
-              className="rounded px-2 py-1 text-zinc-300 transition hover:text-red-300"
-              onClick={clearDrawings}
-            >
-              Clear
-            </button>
-          )}
-        </div>
         {overlays.pdZones && premiumDiscount && pdZones.length > 0 && (
           <div className="pointer-events-none absolute inset-0 z-5">
             {pdZones.map((zone) => (
@@ -3030,10 +3144,7 @@ export function ChartPanel({
               </option>
             ))}
           </select>
-          <div className="flex flex-col text-right leading-tight">
-            <span className="text-[10px] font-normal text-zinc-400">{liveDate}</span>
-            <span className="inline-block rounded bg-black/70 px-2 py-0.5 text-sm text-white">{liveClock}</span>
-          </div>
+          <LiveClockDisplay clockTz={clockTz} />
         </div>
       </div>
       {setupStatsEntries.length > 0 && (
@@ -3078,6 +3189,32 @@ export function ChartPanel({
       )}
     </div>
   );
+}
+
+function LiveClockDisplay({ clockTz }: { clockTz: string }) {
+  const [clockState, setClockState] = useState(() => getClockState(clockTz));
+
+  useEffect(() => {
+    const updateClock = () => setClockState(getClockState(clockTz));
+    updateClock();
+    const id = window.setInterval(updateClock, 1000);
+    return () => window.clearInterval(id);
+  }, [clockTz]);
+
+  return (
+    <div className="flex flex-col text-right leading-tight">
+      <span className="text-[10px] font-normal text-zinc-400">{clockState.date}</span>
+      <span className="inline-block rounded bg-black/70 px-2 py-0.5 text-sm text-white">{clockState.time}</span>
+    </div>
+  );
+}
+
+function getClockState(clockTz: string) {
+  const now = new Date();
+  return {
+    date: formatWithTz(now, clockTz, { weekday: "short", month: "short", day: "numeric" }),
+    time: formatWithTz(now, clockTz),
+  };
 }
 
 function formatPrice(value: number) {

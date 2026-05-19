@@ -1,4 +1,5 @@
 import { useAppStore } from '@/state/useAppStore';
+import { RuntimeStatusPanel, type RuntimeStatusItem } from './RuntimeStatusPanel';
 
 type InfoDrawerProps = {
   source?: string | null;
@@ -8,6 +9,7 @@ type InfoDrawerProps = {
   gapsCount: number;
   swingsCount: number;
   sweepsCount: number;
+  runtimeStatuses: RuntimeStatusItem[];
 };
 
 export function InfoDrawer({
@@ -18,6 +20,7 @@ export function InfoDrawer({
   gapsCount,
   swingsCount,
   sweepsCount,
+  runtimeStatuses,
 }: InfoDrawerProps) {
   const { toggleInfo } = useAppStore();
   return (
@@ -48,6 +51,11 @@ export function InfoDrawer({
             <span className="font-semibold text-white">{candlesCount.toLocaleString()}</span>
           </div>
         </div>
+      </section>
+
+      <section>
+        <p className="mb-1 text-xs uppercase text-zinc-500">Runtime</p>
+        <RuntimeStatusPanel items={runtimeStatuses} compact />
       </section>
 
       <section>

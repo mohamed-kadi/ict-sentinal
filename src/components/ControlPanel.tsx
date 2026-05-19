@@ -1,32 +1,80 @@
 'use client';
 
-import { CRYPTO_SYMBOLS, FOREX_SYMBOLS, STOCK_SYMBOLS, TIMEFRAMES } from '@/lib/config';
+import { useEffect, useMemo } from 'react';
+import { TIMEFRAMES } from '@/lib/config';
 import { useAppStore } from '@/state/useAppStore';
 
-export function ControlPanel() {
+const ADVANCED_SETUP_VALUES = new Set(['Silver Bullet', 'Turtle Soup']);
+const FALLBACK_SUPPORTED_SETUPS = [
+  'Bias + OB/FVG + Session',
+  'CHoCH + FVG + OTE',
+  'PD Array (Discount)',
+  'PD Array (Premium)',
+  'Sweep + Shift',
+  'Trend Pullback',
+  'Kill Zone Liquidity Entry',
+  'Asia Sweep Reversal',
+  'Silver Bullet',
+  'Turtle Soup',
+  'Engulfing Shift',
+  'Pullback Reentry',
+] as const;
+const MODEL_2022_SETUP = 'Model 2022 M15 FVG';
+
+type ControlPanelProps = {
+  supportedSetups?: string[];
+};
+
+export function ControlPanel({ supportedSetups = [] }: ControlPanelProps) {
   const {
-    assetClass,
-    symbol,
     timeframe,
     overlays,
+    backtest,
     selectedSetup,
-    setSymbol,
+    clearTrades,
     setTimeframe,
+    setBacktest,
     toggleOverlay,
     setSelectedSetup,
-    backtest,
-    setBacktest,
     setAllOverlays,
     notificationsEnabled,
     toggleNotifications,
-    clearTrades,
     toggleSidebar,
   } = useAppStore();
+  const resolvedSupportedSetups = useMemo(
+    () => uniqueSetups(supportedSetups.length ? supportedSetups : [...FALLBACK_SUPPORTED_SETUPS]),
+    [supportedSetups],
+  );
+  const standardSetups = useMemo(
+    () => resolvedSupportedSetups.filter((setup) => !ADVANCED_SETUP_VALUES.has(setup)),
+    [resolvedSupportedSetups],
+  );
+  const advancedSetups = useMemo(
+    () => resolvedSupportedSetups.filter((setup) => ADVANCED_SETUP_VALUES.has(setup)),
+    [resolvedSupportedSetups],
+  );
+  const validSelections = useMemo(
+    () => new Set(['all', 'advanced', MODEL_2022_SETUP, ...resolvedSupportedSetups]),
+    [resolvedSupportedSetups],
+  );
+
+  useEffect(() => {
+    if (!validSelections.has(selectedSetup)) {
+      setSelectedSetup('all');
+    }
+  }, [selectedSetup, setSelectedSetup, validSelections]);
 
   return (
-    <div className="flex w-80 flex-col gap-4 rounded-xl border border-zinc-800 bg-zinc-950/90 p-4 text-sm text-zinc-200 shadow-2xl shadow-black/50">
+    <div className="flex h-full w-80 flex-col gap-2.5 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950/90 p-3 text-sm text-zinc-200 shadow-2xl shadow-black/50">
       <div className="flex items-center justify-between">
-        <p className="text-xs uppercase tracking-wide text-zinc-400">Chart Layers</p>
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-sm text-zinc-200">
+            ☰
+          </span>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">Chart Layers</p>
+          </div>
+        </div>
         <button
           className="rounded px-2 py-1 text-xs text-zinc-300 transition hover:text-emerald-200"
           onClick={() => toggleSidebar()}
@@ -36,22 +84,67 @@ export function ControlPanel() {
         </button>
       </div>
       <section>
-        <p className="mb-1 text-xs uppercase text-zinc-500">Timeframe</p>
-        <div className="flex flex-wrap gap-2">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs uppercase text-zinc-500">Timeframe</p>
+          <span className="text-[10px] uppercase tracking-wide text-zinc-600">Quick switch</span>
+        </div>
+        <div className="grid grid-cols-8 gap-1">
           {TIMEFRAMES.map((tf) => (
             <button
               key={tf}
               className={[
-                'flex h-8 w-8 items-center justify-center rounded-full border text-[11px] font-semibold transition',
+                'flex h-7 min-w-0 items-center justify-center rounded-md border px-1 text-[10px] font-semibold leading-none transition',
                 timeframe === tf
                   ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-200'
                   : 'border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700',
               ].join(' ')}
               onClick={() => setTimeframe(tf)}
+              title={`Switch to ${tf}`}
             >
               {tf}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section>
+        <div className="flex items-center justify-between text-xs uppercase text-zinc-500">
+          <span>Entry alerts</span>
+          <label className="flex items-center gap-2 text-[11px] normal-case text-zinc-300">
+            <input
+              type="checkbox"
+              className="accent-emerald-400"
+              checked={notificationsEnabled}
+              onChange={toggleNotifications}
+            />
+            <span>{notificationsEnabled ? 'On' : 'Off'}</span>
+          </label>
+        </div>
+        <div className="mt-2">
+          <p className="mb-1 text-xs uppercase text-zinc-500">Setup</p>
+          <select
+            className="w-full rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs"
+            value={selectedSetup}
+            onChange={(e) => setSelectedSetup(e.target.value)}
+          >
+            <option value="all">All</option>
+            {standardSetups.map((setup) => (
+              <option key={setup} value={setup}>
+                {setup}
+              </option>
+            ))}
+            <option value={MODEL_2022_SETUP}>Model 2022 (M15 FVG)</option>
+            {advancedSetups.length > 0 && (
+              <optgroup label="Advanced ICT">
+                <option value="advanced">Advanced ICT (All)</option>
+                {advancedSetups.map((setup) => (
+                  <option key={setup} value={setup}>
+                    {setup}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
         </div>
       </section>
 
@@ -73,135 +166,105 @@ export function ControlPanel() {
             </button>
           </div>
         </div>
-        <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-3 gap-1.5">
           {Object.entries(overlays).map(([key, value]) => (
-            <label key={key} className="flex items-center justify-between gap-2">
-              <span className="capitalize">{labelFor(key)}</span>
-              <input
-                type="checkbox"
-                className="accent-emerald-400"
-                checked={value}
-                onChange={() => toggleOverlay(key as any)}
-              />
-            </label>
+            <button
+              key={key}
+              type="button"
+              aria-pressed={value}
+              className={[
+                'flex min-h-14 flex-col items-start justify-between rounded-lg border px-2 py-1.5 text-left text-[10px] transition',
+                value
+                  ? 'border-emerald-500/35 bg-emerald-500/8 text-emerald-100'
+                  : 'border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700',
+              ].join(' ')}
+              onClick={() => toggleOverlay(key as any)}
+            >
+              <span className="line-clamp-2 leading-tight">{labelFor(key)}</span>
+              <span
+                className={[
+                  'rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
+                  value ? 'bg-emerald-500/15 text-emerald-200' : 'bg-zinc-800 text-zinc-500',
+                ].join(' ')}
+              >
+                {value ? 'On' : 'Off'}
+              </span>
+            </button>
           ))}
         </div>
-        <div className="mt-3 flex items-center justify-between text-xs uppercase text-zinc-500">
-          <span>Entry alerts</span>
-          <label className="flex items-center gap-2 text-[11px] normal-case text-zinc-300">
-            <input
-              type="checkbox"
-              className="accent-emerald-400"
-              checked={notificationsEnabled}
-              onChange={toggleNotifications}
-            />
-            <span>{notificationsEnabled ? 'On' : 'Off'}</span>
-          </label>
-        </div>
-        <div className="mt-3">
-          <p className="mb-1 text-xs uppercase text-zinc-500">Setup</p>
-          <select
-            className="w-full rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs"
-            value={selectedSetup}
-            onChange={(e) => setSelectedSetup(e.target.value)}
-          >
-            <option value="all">All</option>
-            <option value="Bias + OB/FVG + Session">Bias + OB/FVG + Session</option>
-            <option value="CHoCH + FVG + OTE">CHoCH + FVG + OTE</option>
-            <option value="Sweep + Shift">Sweep + Shift</option>
-            <option value="Breaker Retest">Breaker Retest</option>
-            <option value="Sweep + CHoCH">Sweep + CHoCH</option>
-            <option value="Breaker + FVG">Breaker + FVG</option>
-            <option value="Breaker + CHoCH">Breaker + CHoCH</option>
-            <option value="PD Array (Discount)">PD Array Discount</option>
-            <option value="PD Array (Premium)">PD Array Premium</option>
-            <option value="FVG Fill Rejection">FVG Fill Rejection</option>
-            <option value="Breaker + Sweep">Breaker + Sweep</option>
-            <option value="Judas Swing">Judas Swing</option>
-            <option value="Liquidity Void Return">Liquidity Void Return</option>
-            <option value="Asian Range Breakout">Asian Range Breakout</option>
-            <option value="Model 2022 M15 FVG">Model 2022 (M15 FVG)</option>
-            <optgroup label="Advanced ICT">
-              <option value="advanced">Advanced ICT (All)</option>
-              <option value="Silver Bullet">Silver Bullet</option>
-              <option value="Turtle Soup">Turtle Soup</option>
-            </optgroup>
-          </select>
-        </div>
-      </section>
-
-      <section>
-        <p className="mb-2 text-xs uppercase text-zinc-500">Backtest</p>
-        <div className="flex items-center justify-between">
-          <span>Enable</span>
-          <input
-            type="checkbox"
-            className="accent-emerald-400"
-            checked={backtest.enabled}
-            onChange={() => setBacktest({ enabled: !backtest.enabled })}
-          />
-        </div>
-        <button
-          className="mt-2 w-full rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-300 transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:opacity-50"
-          type="button"
-          onClick={() => {
-            clearTrades();
-            setBacktest({ cursor: 0, playing: false });
-          }}
-          disabled={!backtest.enabled && backtest.trades.length === 0 && backtest.cursor === 0}
-        >
-          Reset run
-        </button>
-        <div className="mt-2 flex gap-2">
-          <button
-            type="button"
-            className="flex-1 rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-300 transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:opacity-50"
-            onClick={() => setBacktest({ playing: !backtest.playing })}
-            disabled={!backtest.enabled}
-          >
-            {backtest.playing ? 'Pause' : 'Play'}
-          </button>
-          <button
-            type="button"
-            className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-300 transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:opacity-50"
-            onClick={() => setBacktest({ cursor: Math.max(0, backtest.cursor - 1), playing: false })}
-            disabled={!backtest.enabled}
-          >
-            -1
-          </button>
-          <button
-            type="button"
-            className="rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-300 transition hover:border-emerald-500/60 hover:text-emerald-200 disabled:opacity-50"
-            onClick={() => setBacktest({ cursor: backtest.cursor + 1, playing: false })}
-            disabled={!backtest.enabled}
-          >
-            +1
-          </button>
-        </div>
-        <div className="mt-2">
-          <div className="mb-1 flex items-center justify-between text-xs">
-            <span>Speed</span>
-            <span className="text-zinc-500">{backtest.speed.toFixed(2)}x</span>
+        <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">
+          <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wide text-zinc-500">
+            <span>Replay</span>
+            <span
+              className={[
+                'rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
+                backtest.enabled ? 'bg-emerald-500/15 text-emerald-200' : 'bg-zinc-800 text-zinc-500',
+              ].join(' ')}
+            >
+              {backtest.enabled ? 'On' : 'Off'}
+            </span>
           </div>
-          <input
-            type="range"
-            min={0.1}
-            max={10}
-            step={0.05}
-            value={backtest.speed}
-            onChange={(e) => setBacktest({ speed: Number(e.target.value) })}
-            className="w-full accent-emerald-400"
-          />
-          <div className="mt-1 flex justify-between text-[10px] text-zinc-500">
-            {[0.1, 0.25, 0.5, 1, 2, 5, 10].map((v) => (
-              <button
-                key={v}
-                className={`rounded px-1 py-0.5 ${backtest.speed === v ? 'bg-emerald-500/20 text-emerald-200' : 'hover:text-emerald-200'}`}
-                onClick={() => setBacktest({ speed: v })}
-              >
-                {v}x
-              </button>
-            ))}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className={controlBtn(backtest.enabled)}
+              onClick={() =>
+                setBacktest({
+                  enabled: !backtest.enabled,
+                  playing: false,
+                })
+              }
+            >
+              {backtest.enabled ? 'Disable' : 'Enable'}
+            </button>
+            <button
+              type="button"
+              className={controlBtn(false)}
+              onClick={() => {
+                clearTrades();
+                setBacktest({ cursor: 0, playing: false });
+              }}
+              disabled={!backtest.enabled && backtest.cursor === 0 && backtest.trades.length === 0}
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              className={controlBtn(backtest.playing)}
+              onClick={() => setBacktest({ playing: !backtest.playing })}
+              disabled={!backtest.enabled}
+            >
+              {backtest.playing ? 'Pause' : 'Play'}
+            </button>
+            <div className="flex items-center justify-end gap-1">
+              {[0.5, 1, 2, 5].map((speed) => (
+                <button
+                  key={speed}
+                  type="button"
+                  className={speedChip(backtest.speed === speed)}
+                  onClick={() => setBacktest({ speed })}
+                  disabled={!backtest.enabled}
+                >
+                  {speed}x
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={controlBtn(false)}
+              onClick={() => setBacktest({ cursor: Math.max(0, backtest.cursor - 1), playing: false })}
+              disabled={!backtest.enabled || backtest.cursor <= 0}
+            >
+              Step -1
+            </button>
+            <button
+              type="button"
+              className={controlBtn(false)}
+              onClick={() => setBacktest({ cursor: backtest.cursor + 1, playing: false })}
+              disabled={!backtest.enabled}
+            >
+              Step +1
+            </button>
           </div>
         </div>
       </section>
@@ -209,46 +272,59 @@ export function ControlPanel() {
   );
 }
 
-function buttonClass(active: boolean) {
+function controlBtn(active: boolean) {
   return [
-    'rounded border px-3 py-1 text-xs font-semibold transition',
+    'rounded border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-50',
     active
       ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-200'
-      : 'border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700',
+      : 'border-zinc-800 bg-zinc-950 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100',
+  ].join(' ');
+}
+
+function speedChip(active: boolean) {
+  return [
+    'rounded border px-1.5 py-1 text-[9px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
+    active
+      ? 'border-sky-500/60 bg-sky-500/10 text-sky-200'
+      : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200',
   ].join(' ');
 }
 
 function labelFor(key: string) {
   switch (key) {
     case 'liquidity':
-      return 'Liquidity/Swing Highs-Lows';
+      return 'Liquidity';
     case 'fvg':
-      return 'Fair Value Gaps';
+      return 'FVG';
     case 'orderBlocks':
       return 'Order Blocks';
     case 'sessions':
-      return 'Kill Zones';
+      return 'Sessions';
     case 'killzones':
-      return 'Kill Zone Shading';
+      return 'Killzones';
     case 'signals':
       return 'Signals';
     case 'sweeps':
-      return 'EQH/EQL Sweeps';
+      return 'Sweeps';
     case 'breakers':
-      return 'Breaker Blocks';
+      return 'Breakers';
     case 'oteBands':
-      return 'OTE Bands';
+      return 'OTE';
     case 'pdZones':
-      return 'Premium/Discount Zones';
+      return 'PD Zones';
     case 'inversionFvgSignals':
-      return 'Inversion FVG signals';
+      return 'Inv FVG';
     case 'tradeMarkers':
-      return 'Trade markers';
+      return 'Trades';
     case 'structureSegments':
-      return 'BOS/CHoCH segments';
+      return 'BOS/CHoCH';
     case 'eqConnectors':
-      return 'EQH/EQL connectors';
+      return 'EQ Connect';
     default:
       return key;
   }
+}
+
+function uniqueSetups(setups: readonly string[]) {
+  return Array.from(new Set(setups.filter(Boolean)));
 }
