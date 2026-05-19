@@ -17,7 +17,7 @@ Install dependencies:
 
 ```bash
 cd web
-npm install
+PATH="$(pwd)/.tools/node/current/bin:$PATH" npm install
 ```
 
 Start the dev server:
@@ -54,6 +54,18 @@ Notes:
 - React Query
 - Zustand
 - Lightweight Charts
+
+## Node runtime
+
+This app ships a repo-local Node toolchain in `web/.tools/node/current`.
+
+- `npm run dev`
+- `npm run build`
+- `npm run start`
+- `npm run lint`
+- `npm run typecheck`
+
+all prepend that local Node binary automatically, so they do not depend on your global `node` path.
 
 ## Verification
 
