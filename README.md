@@ -1,6 +1,6 @@
-# ICTCrakr Web
+# ICT Trading Desk Web
 
-Next.js 16 frontend for the ICTCrakr trading desk.
+Next.js 16 frontend for the ICT Trading Desk workstation.
 
 This app fetches public market data, renders the charting UI, manages replay/backtest state, and calls the Spring Boot backend for server-side ICT analysis and trade journaling.
 
