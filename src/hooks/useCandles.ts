@@ -16,6 +16,7 @@ type CandlePage = CandleResponse & { nextCursor: number | null };
 
 const CRYPTO_CHUNK = 900;
 const FOREX_CHUNK = 1500;
+const STOCK_CHUNK = 1500;
 
 async function fetchCandles(
   assetClass: AssetClass,
@@ -24,10 +25,14 @@ async function fetchCandles(
   limit: number,
   before?: number | null,
 ): Promise<CandlePage> {
-  const baseUrl =
+  const maxLimit = assetClass === 'crypto' ? 1000 : 5000;
+  const routePath =
     assetClass === 'crypto'
-      ? `/api/crypto/klines?symbol=${symbol}&interval=${timeframe}&limit=${Math.min(limit, 1000)}`
-      : `/api/forex/klines?symbol=${symbol}&interval=${timeframe}&limit=${Math.min(limit, 5000)}`;
+      ? '/api/crypto/klines'
+      : assetClass === 'stocks'
+        ? '/api/stocks/klines'
+        : '/api/forex/klines';
+  const baseUrl = `${routePath}?symbol=${symbol}&interval=${timeframe}&limit=${Math.min(limit, maxLimit)}`;
   const url = new URL(baseUrl, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
   if (before && Number.isFinite(before)) {
     url.searchParams.set('endTime', String(before));
@@ -42,7 +47,7 @@ async function fetchCandles(
   const candles = [...raw].sort((a, b) => a.t - b.t);
   const earliest = candles[0]?.t ?? null;
   const nextCursor =
-    candles.length >= Math.min(limit, assetClass === 'crypto' ? 1000 : 5000) && earliest != null
+    candles.length >= Math.min(limit, maxLimit) && earliest != null
       ? earliest - 1
       : null;
   return {
@@ -57,7 +62,11 @@ async function fetchCandles(
 
 export function useCandles(assetClass: AssetClass, symbol: string, timeframe: Timeframe) {
   const chunk =
-    assetClass === 'crypto' ? Math.min(CRYPTO_CHUNK, 1000) : Math.min(FOREX_CHUNK, 5000);
+    assetClass === 'crypto'
+      ? Math.min(CRYPTO_CHUNK, 1000)
+      : assetClass === 'stocks'
+        ? Math.min(STOCK_CHUNK, 5000)
+        : Math.min(FOREX_CHUNK, 5000);
   const query = useInfiniteQuery<
     CandlePage, // TQueryFnData
     Error, // TError

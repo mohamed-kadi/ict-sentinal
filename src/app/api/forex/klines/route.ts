@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
   try {
     if (symbol === 'XAUUSD') {
       try {
-        const data = await fetchBinanceXau(symbol, interval, limit);
+        const data = await fetchBinanceXau(symbol, interval, limit, before);
         return NextResponse.json({
           ...data,
           candles: applyWindow(data.candles, before, limit),
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     // prefer TwelveData if available
     if (process.env.TWELVE_DATA_KEY) {
       try {
-        const data = await fetchTwelveData(symbol, interval, limit, process.env.TWELVE_DATA_KEY);
+        const data = await fetchTwelveData(symbol, interval, limit, process.env.TWELVE_DATA_KEY, before);
         return NextResponse.json({
           ...data,
           candles: applyWindow(data.candles, before, limit),
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
         // continue to next provider
       }
     }
-    if (process.env.ALPHA_VANTAGE_KEY) {
+    if (process.env.ALPHA_VANTAGE_KEY && before == null) {
       try {
         const data = await fetchAlphaVantage(symbol, interval, limit, process.env.ALPHA_VANTAGE_KEY);
         return NextResponse.json({
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     }
     // fallback to Yahoo Finance (no key required)
     try {
-      const yahoo = await fetchYahoo(symbol, interval, limit);
+      const yahoo = await fetchYahoo(symbol, interval, limit, before);
       return NextResponse.json({
         ...yahoo,
         candles: applyWindow(yahoo.candles, before, limit),
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function fetchTwelveData(symbol: string, interval: string, limit: number, key: string) {
+async function fetchTwelveData(symbol: string, interval: string, limit: number, key: string, before: number | null) {
   const mappedInterval = TWELVE_INTERVALS[interval];
   if (!mappedInterval) throw new Error('Unsupported interval for TwelveData');
   const resolvedSymbol = await resolveTwelveSymbol(symbol, key).catch(() => symbol);
@@ -127,6 +127,10 @@ async function fetchTwelveData(symbol: string, interval: string, limit: number, 
   url.searchParams.set('apikey', key);
   url.searchParams.set('outputsize', String(limit));
   url.searchParams.set('format', 'JSON');
+  if (before && Number.isFinite(before)) {
+    url.searchParams.set('end_date', toTwelveDate(before));
+    url.searchParams.set('timezone', 'UTC');
+  }
 
   const res = await fetch(url, { cache: 'no-store' });
   const json = await res.json();
@@ -194,13 +198,16 @@ function normalizeSymbol(symbol: string) {
   return clean;
 }
 
-async function fetchBinanceXau(symbol: string, interval: string, limit: number) {
+async function fetchBinanceXau(symbol: string, interval: string, limit: number, before: number | null) {
   const binanceInterval = BINANCE_INTERVALS[interval];
   if (!binanceInterval) throw new Error('Unsupported interval for Binance XAU');
   const url = new URL('https://api.binance.com/api/v3/klines');
   url.searchParams.set('symbol', 'PAXGUSDT'); // PAX Gold spot maps closely to XAUUSD
   url.searchParams.set('interval', binanceInterval);
   url.searchParams.set('limit', String(clamp(limit, 10, 1000)));
+  if (before && Number.isFinite(before)) {
+    url.searchParams.set('endTime', String(Math.floor(before)));
+  }
 
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Binance XAU error ${res.status}`);
@@ -220,14 +227,21 @@ async function fetchBinanceXau(symbol: string, interval: string, limit: number) 
   return { symbol, interval, candles, timezone: 'UTC' };
 }
 
-async function fetchYahoo(symbol: string, interval: string, limit: number) {
+async function fetchYahoo(symbol: string, interval: string, limit: number, before: number | null) {
   const yahooInterval = mapYahooInterval(interval);
   if (!yahooInterval) throw new Error('Unsupported interval for Yahoo');
   const yahooSymbol = mapYahooSymbol(symbol);
 
   const url = new URL('https://query1.finance.yahoo.com/v8/finance/chart/' + yahooSymbol);
   url.searchParams.set('interval', yahooInterval);
-  url.searchParams.set('range', yahooRangeFromInterval(interval, limit));
+  if (before && Number.isFinite(before)) {
+    const period2 = Math.floor(before / 1000);
+    const period1 = Math.max(0, Math.floor((before - yahooWindowMs(interval, limit)) / 1000));
+    url.searchParams.set('period1', String(period1));
+    url.searchParams.set('period2', String(period2));
+  } else {
+    url.searchParams.set('range', yahooRangeFromInterval(interval, limit));
+  }
 
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Yahoo error ${res.status}`);
@@ -335,6 +349,19 @@ function yahooRangeFromInterval(interval: string, limit: number) {
   if (interval === '1D' || interval === '1W') return '1y';
   if (interval === '1M') return '2y';
   return '6mo';
+}
+
+function yahooWindowMs(interval: string, limit: number) {
+  if (interval === '1m') return 2 * 24 * 60 * 60 * 1000;
+  if (interval === '5m' || interval === '15m') return 31 * 24 * 60 * 60 * 1000;
+  if (interval === '1h' || interval === '4h') return 93 * 24 * 60 * 60 * 1000;
+  if (interval === '1D' || interval === '1W') return 366 * 24 * 60 * 60 * 1000;
+  if (interval === '1M') return 730 * 24 * 60 * 60 * 1000;
+  return Math.max(limit, 1) * 24 * 60 * 60 * 1000;
+}
+
+function toTwelveDate(epochMs: number) {
+  return new Date(epochMs).toISOString().slice(0, 19).replace('T', ' ');
 }
 
 function applyWindow<T extends { t: number }>(candles: T[], before: number | null, limit: number): T[] {
