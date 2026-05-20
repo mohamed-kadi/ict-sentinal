@@ -2,6 +2,13 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type {
+  AlertRelayAcceptanceStatus,
+  AlertRelayAckStatus,
+  AlertRelayChannel,
+  AlertRelayDeliveryStatus,
+  AlertRelayResponseSnapshot,
+} from '@/lib/alertConnectors';
 import { AssetClass, Timeframe, Drawing, DrawingType, Bias } from '@/lib/types';
 
 type OverlayKey =
@@ -44,6 +51,8 @@ export type BacktestTrade = {
   sessionLabel?: string | null;
   biasLabel?: Bias['label'];
   manual?: boolean;
+  armedAt?: number;
+  expiresAt?: number;
   status?: 'planned' | 'active' | 'closed' | 'canceled';
 };
 
@@ -55,6 +64,27 @@ export type BacktestState = {
   trades: BacktestTrade[];
   balance: number;
   autoTrade: boolean;
+};
+
+export type AlertDiagnostics = {
+  status: 'live' | 'paused' | 'stale';
+  message: string;
+  detail?: string;
+  since: number;
+};
+
+export type AlertRelayEvent = {
+  id: string;
+  signalTime: number;
+  direction: 'buy' | 'sell';
+  setup?: string;
+  channel: AlertRelayChannel | 'auto-trade';
+  deliveryStatus: AlertRelayDeliveryStatus;
+  ackStatus: AlertRelayAckStatus;
+  acceptanceStatus: AlertRelayAcceptanceStatus;
+  detail: string;
+  lastResponse: AlertRelayResponseSnapshot | null;
+  createdAt: number;
 };
 
 type AppState = {
@@ -70,6 +100,7 @@ type AppState = {
   drawings: Drawing[];
   clockTz: string;
   notificationsEnabled: boolean;
+  waitForRetest: boolean;
   optimizerEnabled: boolean;
   setAssetClass: (asset: AssetClass) => void;
   setSymbol: (symbol: string) => void;
@@ -87,17 +118,16 @@ type AppState = {
   setClockTz: (tz: string) => void;
   setAllOverlays: (value: boolean) => void;
   toggleNotifications: () => void;
+  setWaitForRetest: (value: boolean) => void;
   toggleOptimizer: () => void;
   alertStatus: AlertDiagnostics | null;
   setAlertStatus: (status: AlertDiagnostics | null) => void;
+  alertRelayEvents: AlertRelayEvent[];
+  pushAlertRelayEvent: (
+    event: Omit<AlertRelayEvent, 'id' | 'createdAt'> & Partial<Pick<AlertRelayEvent, 'id' | 'createdAt'>>,
+  ) => void;
+  clearAlertRelayEvents: () => void;
   updateTrade: (id: string, patch: Partial<BacktestTrade>) => void;
-};
-
-export type AlertDiagnostics = {
-  status: 'live' | 'paused' | 'stale';
-  message: string;
-  detail?: string;
-  since: number;
 };
 
 export const useAppStore = create<AppState>()(
@@ -130,8 +160,10 @@ export const useAppStore = create<AppState>()(
       drawings: [],
       clockTz: 'America/New_York',
       notificationsEnabled: true,
+      waitForRetest: false,
       optimizerEnabled: true,
       alertStatus: null,
+      alertRelayEvents: [],
       setAssetClass: (assetClass) => set({ assetClass }),
       setSymbol: (symbol) => set({ symbol }),
       setTimeframe: (timeframe) => set({ timeframe }),
@@ -192,11 +224,24 @@ export const useAppStore = create<AppState>()(
           notificationsEnabled: !state.notificationsEnabled,
           alertStatus: state.notificationsEnabled ? null : state.alertStatus,
         })),
+      setWaitForRetest: (waitForRetest) => set({ waitForRetest }),
       toggleOptimizer: () =>
         set((state) => ({
           optimizerEnabled: !state.optimizerEnabled,
         })),
       setAlertStatus: (alertStatus) => set({ alertStatus }),
+      pushAlertRelayEvent: (event) =>
+        set((state) => ({
+          alertRelayEvents: [
+            ...state.alertRelayEvents,
+            {
+              id: event.id ?? crypto.randomUUID(),
+              createdAt: event.createdAt ?? Date.now(),
+              ...event,
+            },
+          ].slice(-20),
+        })),
+      clearAlertRelayEvents: () => set({ alertRelayEvents: [] }),
     }),
     {
       name: 'ict-app-store',
@@ -214,6 +259,7 @@ export const useAppStore = create<AppState>()(
         drawings: state.drawings,
         clockTz: state.clockTz,
         notificationsEnabled: state.notificationsEnabled,
+        waitForRetest: state.waitForRetest,
         optimizerEnabled: state.optimizerEnabled,
       }),
     },

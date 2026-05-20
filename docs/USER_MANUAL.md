@@ -16,6 +16,9 @@ Optional frontend environment:
 NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8080
 TWELVE_DATA_KEY=your_key
 ALPHA_VANTAGE_KEY=your_key
+ALERT_WEBHOOK_URL=https://your-endpoint.example/webhook
+ALERT_EXECUTION_URL=https://your-execution.example/alerts
+NEXT_PUBLIC_ALERT_RELAY_MODE=webhook
 NEXT_PUBLIC_ALERT_WEBHOOK=https://your-endpoint.example/webhook
 NEXT_PUBLIC_DEBUG_SIGNALS=false
 ```
@@ -34,6 +37,31 @@ NEXT_PUBLIC_DEBUG_SIGNALS=false
 3. Enable the backend URL if you want server-side ICT analysis and setup generation.
 4. Use replay mode to scope the visible candles to a point in history.
 5. Review overlays, runtime notices, and the latest signals before journaling a trade.
+
+## Retest Mode
+- `Retest Mode` lives in the `ControlPanel` under `Entry alerts`.
+- When it is `Off`, eligible signals enter immediately when the signal candle closes.
+- When it is `On`, supported setups are armed first and the paper trade waits for a later candle to retest the entry level before opening.
+- Armed trades expire after 3 candles if price never comes back to the entry.
+
+Strategies that currently use retest mode when it is on:
+- `Bias + OB/FVG + Session`
+- `CHoCH + FVG + OTE`
+- `Model 2022 M15 FVG`
+- `Trend Pullback`
+- `Kill Zone Liquidity Entry`
+- `PD Array (Discount)`
+- `PD Array (Premium)`
+
+Strategies that currently opt out and still use immediate entry:
+- `Pullback Reentry`
+- `Sweep + Shift`
+- `Silver Bullet`
+- `Turtle Soup`
+- Any setup not explicitly listed in the retest-enabled list above
+
+Why some setups opt out:
+- `Pullback Reentry`, `Silver Bullet`, and `Turtle Soup` already treat the signal candle itself as the confirmation/rejection event, so waiting for another revisit would materially change the setup.
 
 ## Notes on Data Freshness
 - Crypto uses REST candles plus a websocket patch for the current live candle.

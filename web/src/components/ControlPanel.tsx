@@ -38,6 +38,8 @@ export function ControlPanel({ supportedSetups = [] }: ControlPanelProps) {
     setSelectedSetup,
     setAllOverlays,
     notificationsEnabled,
+    waitForRetest,
+    setWaitForRetest,
     toggleNotifications,
     toggleSidebar,
   } = useAppStore();
@@ -119,6 +121,32 @@ export function ControlPanel({ supportedSetups = [] }: ControlPanelProps) {
             />
             <span>{notificationsEnabled ? 'On' : 'Off'}</span>
           </label>
+        </div>
+        <div className="mt-2 flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/70 px-2 py-2 text-[11px] text-zinc-300">
+          <div>
+            <div className="font-semibold uppercase tracking-wide text-zinc-400">Retest Mode</div>
+            <div className="mt-0.5 text-[10px] text-zinc-500">Arm supported setups and wait for a later touch.</div>
+          </div>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="accent-emerald-400"
+              checked={waitForRetest}
+              onChange={(e) => setWaitForRetest(e.target.checked)}
+            />
+            <span>{waitForRetest ? 'On' : 'Off'}</span>
+          </label>
+        </div>
+        <div className="mt-2 rounded-lg border border-zinc-800 bg-zinc-950/70 px-2 py-2 text-[10px] leading-relaxed text-zinc-400">
+          <div>
+            <span className="font-semibold text-zinc-300">Uses retest:</span> Bias + OB/FVG + Session, CHoCH + FVG +
+            OTE, Model 2022 M15 FVG, Trend Pullback, Kill Zone Liquidity Entry, PD Array (Discount), PD Array
+            (Premium).
+          </div>
+          <div className="mt-1">
+            <span className="font-semibold text-zinc-300">Immediate entry:</span> Pullback Reentry, Sweep + Shift,
+            Silver Bullet, Turtle Soup, and any setup not listed above.
+          </div>
         </div>
         <div className="mt-2">
           <p className="mb-1 text-xs uppercase text-zinc-500">Setup</p>

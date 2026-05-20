@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ControlPanel } from './ControlPanel';
 import { ChartPanel } from './ChartPanel';
 import { TopBar } from './TopBar';
 import { InsightPanel } from './InsightPanel';
 import { InfoDrawer } from './InfoDrawer';
 import { useAppStore } from '@/state/useAppStore';
-import type { AssetClass, Bias, Candle, Model2022Signal, Model2022State, Signal } from '@/lib/types';
+import type { AssetClass, Bias, Candle, Model2022Signal, Model2022State, Signal, Timeframe } from '@/lib/types';
 import { useCandles } from '@/hooks/useCandles';
 import { evaluateIctScanner } from '@/lib/ictScanner';
 import { useSignalAnalysis } from '@/hooks/useSignalAnalysis';
@@ -64,6 +64,28 @@ export function Dashboard() {
       setBacktest({ cursor: capped });
     }
   }, [backtest.enabled, backtest.cursor, candles.length, setBacktest]);
+
+  useEffect(() => {
+    if (!backtest.enabled || !backtest.playing) return;
+    if (candles.length <= 1) {
+      setBacktest({ playing: false });
+      return;
+    }
+    if (backtest.cursor >= candles.length - 1) {
+      setBacktest({ playing: false });
+      return;
+    }
+    const normalizedSpeed = Math.max(backtest.speed || 1, 0.25);
+    const delayMs = Math.max(80, Math.round(1000 / normalizedSpeed));
+    const id = window.setTimeout(() => {
+      const nextCursor = Math.min(backtest.cursor + 1, candles.length - 1);
+      setBacktest({
+        cursor: nextCursor,
+        playing: nextCursor < candles.length - 1,
+      });
+    }, delayMs);
+    return () => window.clearTimeout(id);
+  }, [backtest.enabled, backtest.playing, backtest.speed, backtest.cursor, candles.length, setBacktest]);
 
   const scopedCandles = useMemo(() => {
     if (!backtest.enabled) return candles;
@@ -150,6 +172,10 @@ export function Dashboard() {
     () => [...(fullAnalysis?.signals ?? scopedAnalysis?.signals ?? []), ...fullModel2022Signals],
     [fullAnalysis?.signals, scopedAnalysis?.signals, fullModel2022Signals],
   );
+  const [activeSignalPrompt, setActiveSignalPrompt] = useState<Signal | null>(null);
+  const [activeSignalPromptScore, setActiveSignalPromptScore] = useState<number | null>(null);
+  const [dismissSignalPromptToken, setDismissSignalPromptToken] = useState(0);
+  const [takeSignalPromptToken, setTakeSignalPromptToken] = useState(0);
   const signals = overlays.signals ? notificationSignals : [];
   const latest = scopedCandles.at(-1);
   const prev = scopedCandles.at(-2);
@@ -161,12 +187,34 @@ export function Dashboard() {
   const priceChangePct = priceChangeAbs && prev ? (priceChangeAbs / prev.c) * 100 : null;
   const marketOpen = isMarketOpen(assetClass);
   const displayBias = scopedAnalysis?.bias ?? buildFallbackBias(analysisStatus);
+  const latestSignalTime = notificationSignals.at(-1)?.time ?? null;
+  const latestSignalAnchorTime = latest?.t ?? latestSignalTime;
+  const actionableSignalTime =
+    latestSignalTime != null &&
+    latestSignalAnchorTime != null &&
+    latestSignalTime === latestSignalAnchorTime
+      ? latestSignalTime
+      : null;
   const ictScanner = evaluateIctScanner({
     signal: notificationSignals.at(-1),
     bias: displayBias,
     premiumDiscount,
     latestPrice,
   });
+  const handleSignalPromptChange = useCallback((signal: Signal | null, score: number | null) => {
+    setActiveSignalPrompt(signal);
+    setActiveSignalPromptScore(score);
+  }, []);
+  const dismissActiveSignalPrompt = useCallback(() => {
+    setActiveSignalPrompt(null);
+    setActiveSignalPromptScore(null);
+    setDismissSignalPromptToken((value) => value + 1);
+  }, []);
+  const takeActiveSignalPrompt = useCallback(() => {
+    setActiveSignalPrompt(null);
+    setActiveSignalPromptScore(null);
+    setTakeSignalPromptToken((value) => value + 1);
+  }, []);
 
   return (
     <div className="flex h-screen flex-col bg-zinc-950 text-white">
@@ -255,18 +303,6 @@ export function Dashboard() {
                   <RuntimeStatusPanel items={runtimeIssues} />
                 </div>
               )}
-              {hasMore && (
-                <div className="flex justify-end px-4 pb-2 text-xs text-zinc-300">
-                  <button
-                    type="button"
-                    className="rounded border border-zinc-700 bg-zinc-900 px-3 py-1 font-semibold text-emerald-200 transition hover:border-emerald-500 disabled:opacity-60"
-                    onClick={() => fetchOlder()}
-                    disabled={isFetchingOlder}
-                  >
-                    {isFetchingOlder ? 'Loading older data…' : 'Load older history'}
-                  </button>
-                </div>
-              )}
               <div className="flex flex-1 min-h-0">
                 <div className="flex-1 min-h-0">
                   <ChartPanel
@@ -294,6 +330,9 @@ export function Dashboard() {
                     notificationSignals={notificationSignals}
                     backtestSignals={fullNotificationSignals}
                     overlays={overlays}
+                    onSignalPromptChange={handleSignalPromptChange}
+                    dismissSignalPromptToken={dismissSignalPromptToken}
+                    takeSignalPromptToken={takeSignalPromptToken}
                   />
                 </div>
                 <InsightPanel
@@ -312,6 +351,16 @@ export function Dashboard() {
                   selectedSetup={selectedSetup}
                   ictScanner={ictScanner}
                   premiumDiscount={premiumDiscount}
+                  activeSignal={activeSignalPrompt}
+                  activeSignalScore={activeSignalPromptScore}
+                  backtestEnabled={backtest.enabled}
+                  onTakeActiveSignal={takeActiveSignalPrompt}
+                  onDismissActiveSignal={dismissActiveSignalPrompt}
+                  hasMoreHistory={hasMore}
+                  isFetchingOlderHistory={isFetchingOlder}
+                  onFetchOlderHistory={fetchOlder}
+                  latestSignalTime={latestSignalTime}
+                  actionableSignalTime={actionableSignalTime}
                 />
               </div>
             </>
@@ -489,6 +538,29 @@ function cleanStatusDetail(value?: string | null, maxLength = 180) {
 
 function uniqueSetups(setups: readonly string[]) {
   return Array.from(new Set(setups.filter(Boolean)));
+}
+
+function timeframeToMs(tf: Timeframe) {
+  switch (tf) {
+    case '1m':
+      return 60_000;
+    case '5m':
+      return 5 * 60_000;
+    case '15m':
+      return 15 * 60_000;
+    case '1h':
+      return 60 * 60_000;
+    case '4h':
+      return 4 * 60 * 60_000;
+    case '1D':
+      return 24 * 60 * 60_000;
+    case '1W':
+      return 7 * 24 * 60 * 60_000;
+    case '1M':
+      return 30 * 24 * 60 * 60_000;
+    default:
+      return 60 * 60_000;
+  }
 }
 
 function isMarketOpen(assetClass: AssetClass) {

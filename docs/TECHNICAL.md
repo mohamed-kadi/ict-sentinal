@@ -25,6 +25,34 @@
 - `web/src/state/`: Zustand workspace state.
 - `web/scripts/`: utility scripts and fixtures kept out of shipped frontend assets.
 
+## Execution Modes
+- Immediate-entry mode: a fresh signal opens a paper trade as soon as the signal candle qualifies.
+- Retest mode: a fresh signal creates an armed `planned` trade first; the trade only becomes `active` if a later candle revisits the entry before expiry.
+
+Retest mode wiring:
+- UI toggle: `web/src/components/ControlPanel.tsx`
+- Persisted preference: `waitForRetest` in `web/src/state/useAppStore.ts`
+- Execution policy: `RETEST_CAPABLE_SETUPS` and planned-trade activation in `web/src/components/ChartPanel.tsx`
+
+Current retest-enabled setups:
+- `Bias + OB/FVG + Session`
+- `CHoCH + FVG + OTE`
+- `Model 2022 M15 FVG`
+- `Trend Pullback`
+- `Kill Zone Liquidity Entry`
+- `PD Array (Discount)`
+- `PD Array (Premium)`
+
+Current immediate-entry opt-outs:
+- `Pullback Reentry`
+- `Sweep + Shift`
+- `Silver Bullet`
+- `Turtle Soup`
+- Any setup not explicitly present in `RETEST_CAPABLE_SETUPS`
+
+Maintenance rule:
+- When adding or renaming a setup, explicitly decide whether it belongs in `RETEST_CAPABLE_SETUPS`. If not, it stays on immediate-entry behavior by default.
+
 ## Backend Code Map
 - `backend/.../analysis/api/`: analysis request/response contracts and controller.
 - `backend/.../analysis/service/`: server-side analysis engine.
@@ -45,6 +73,9 @@ Frontend:
 NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8080
 TWELVE_DATA_KEY=your_key
 ALPHA_VANTAGE_KEY=your_key
+ALERT_WEBHOOK_URL=https://your-endpoint.example/webhook
+ALERT_EXECUTION_URL=https://your-execution.example/alerts
+NEXT_PUBLIC_ALERT_RELAY_MODE=webhook
 NEXT_PUBLIC_ALERT_WEBHOOK=https://your-endpoint.example/webhook
 NEXT_PUBLIC_DEBUG_SIGNALS=false
 ```

@@ -37,6 +37,18 @@ Open `http://localhost:3000`.
 - `src/state/`: Zustand store for workspace state, overlays, replay mode, and preferences.
 - `scripts/`: frontend-only utility scripts and fixtures that should not live in `public/`.
 
+## Retest Mode
+- `Retest Mode` is a frontend execution preference exposed in the `ControlPanel`.
+- When enabled, only these setups wait for a later retest before opening a paper trade:
+  - `Bias + OB/FVG + Session`
+  - `CHoCH + FVG + OTE`
+  - `Model 2022 M15 FVG`
+  - `Trend Pullback`
+  - `Kill Zone Liquidity Entry`
+  - `PD Array (Discount)`
+  - `PD Array (Premium)`
+- Immediate-entry opt-outs include `Pullback Reentry`, `Sweep + Shift`, `Silver Bullet`, `Turtle Soup`, and any setup not explicitly listed above.
+
 ## Environment
 
 Create `web/.env.local` when needed:
@@ -45,6 +57,11 @@ Create `web/.env.local` when needed:
 NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8080
 TWELVE_DATA_KEY=your_key
 ALPHA_VANTAGE_KEY=your_key
+ALERT_WEBHOOK_URL=https://your-endpoint.example/webhook
+ALERT_WEBHOOK_TOKEN=optional_secret
+ALERT_EXECUTION_URL=https://your-execution.example/alerts
+ALERT_EXECUTION_TOKEN=optional_secret
+NEXT_PUBLIC_ALERT_RELAY_MODE=webhook
 NEXT_PUBLIC_ALERT_WEBHOOK=https://your-endpoint.example/webhook
 NEXT_PUBLIC_DEBUG_SIGNALS=false
 ```
@@ -53,6 +70,8 @@ Notes:
 - `NEXT_PUBLIC_BACKEND_BASE_URL` enables backend-driven signal analysis and trade journaling.
 - Without that backend URL, the chart can still load candles, but server-side analysis hooks stay disabled.
 - `TWELVE_DATA_KEY` is preferred for forex coverage. If both paid/free providers fail, the route falls back to Yahoo or mock candles.
+- Prefer `ALERT_WEBHOOK_URL` or `ALERT_EXECUTION_URL` so the local relay adapter owns delivery, ack parsing, and last-response tracking.
+- `NEXT_PUBLIC_ALERT_RELAY_MODE` lets the UI show `Webhook` or `Execution` without exposing the actual target URL.
 
 ## Stack
 - Next.js 16.2.6

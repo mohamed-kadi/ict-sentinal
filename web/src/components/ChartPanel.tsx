@@ -31,7 +31,7 @@ import {
 } from "@/lib/types";
 import { SESSION_ZONES } from "@/lib/config";
 import { classifySession } from "@/lib/sessions";
-import { notifyAlertConnectors } from "@/lib/alertConnectors";
+import { alertRelayConfigured, alertRelayLabel, notifyAlertConnectors } from "@/lib/alertConnectors";
 import { CLOCK_OPTIONS, formatWithTz, getClockLabel } from "@/lib/time";
 import { evaluateIctScanner } from "@/lib/ictScanner";
 import { postTradeJournalEntry } from "@/lib/tradePerformance";
@@ -46,6 +46,16 @@ const TIER_ONE_SETUPS = new Set([
   "Silver Bullet",
   "Turtle Soup",
 ]);
+const RETEST_CAPABLE_SETUPS = new Set([
+  "Bias + OB/FVG + Session",
+  "CHoCH + FVG + OTE",
+  "Model 2022 M15 FVG",
+  "Trend Pullback",
+  "Kill Zone Liquidity Entry",
+  "PD Array (Discount)",
+  "PD Array (Premium)",
+]);
+const RETEST_WINDOW_BARS = 3;
 const TIME_LABEL_FORMAT: Intl.DateTimeFormatOptions = {
   month: "short",
   day: "numeric",
@@ -112,6 +122,9 @@ type Props = {
   bias?: Bias;
   latestPrice?: number | null;
   model2022?: Model2022State;
+  onSignalPromptChange?: (signal: Signal | null, score: number | null) => void;
+  dismissSignalPromptToken?: number;
+  takeSignalPromptToken?: number;
   overlays: Record<
     | "liquidity"
     | "fvg"
@@ -155,6 +168,9 @@ export function ChartPanel({
   bias,
   latestPrice,
   model2022,
+  onSignalPromptChange,
+  dismissSignalPromptToken,
+  takeSignalPromptToken,
   overlays,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -181,6 +197,7 @@ export function ChartPanel({
     clockTz,
     setClockTz: updateClockTz,
     notificationsEnabled,
+    waitForRetest,
     optimizerEnabled,
     sidebarOpen,
     addTrade,
@@ -189,6 +206,7 @@ export function ChartPanel({
     setBacktest: patchBacktest,
     alertStatus,
     setAlertStatus,
+    pushAlertRelayEvent,
   } = useAppStore(
     useShallow((state) => ({
       drawingMode: state.drawingMode,
@@ -199,6 +217,7 @@ export function ChartPanel({
       clockTz: state.clockTz,
       setClockTz: state.setClockTz,
       notificationsEnabled: state.notificationsEnabled,
+      waitForRetest: state.waitForRetest,
       optimizerEnabled: state.optimizerEnabled,
       sidebarOpen: state.sidebarOpen,
       addTrade: state.addTrade,
@@ -207,6 +226,7 @@ export function ChartPanel({
       setBacktest: state.setBacktest,
       alertStatus: state.alertStatus,
       setAlertStatus: state.setAlertStatus,
+      pushAlertRelayEvent: state.pushAlertRelayEvent,
     })),
   );
   const candlesSnapshotRef = useRef(candles);
@@ -250,6 +270,10 @@ export function ChartPanel({
   const [signalPrompt, setSignalPrompt] = useState<Signal | null>(null);
   const [signalPromptScore, setSignalPromptScore] = useState<number | null>(null);
   const lastPromptedSignalRef = useRef<number | null>(null);
+  const dismissSignalPromptTokenRef = useRef(dismissSignalPromptToken ?? 0);
+  const takeSignalPromptTokenRef = useRef(takeSignalPromptToken ?? 0);
+  const viewportSyncFrameRef = useRef<number | null>(null);
+  const viewportSyncUntilRef = useRef(0);
   const promptSignalSource = backtest?.enabled
     ? notificationSignals ?? signals
     : backtestSignals ?? notificationSignals ?? signals;
@@ -289,6 +313,10 @@ export function ChartPanel({
     () => Math.max(timeframeMs * 2, 15 * 60_000),
     [timeframeMs],
   );
+  const retestWindowMs = useMemo(
+    () => Math.max(timeframeMs, 60_000) * RETEST_WINDOW_BARS,
+    [timeframeMs],
+  );
   const persistLastPromptedSignal = useCallback(
     (timestamp: number | null) => {
       lastPromptedSignalRef.current = timestamp;
@@ -319,6 +347,32 @@ export function ChartPanel({
     (signal: Signal) => `${signal.direction}-${signal.time}-${signal.setup ?? "ict"}`,
     [],
   );
+  const supportsRetestEntry = useCallback(
+    (signal: Signal) => Boolean(signal.setup && RETEST_CAPABLE_SETUPS.has(signal.setup)),
+    [],
+  );
+  const stopViewportSync = useCallback(() => {
+    if (viewportSyncFrameRef.current != null && typeof window !== "undefined") {
+      window.cancelAnimationFrame(viewportSyncFrameRef.current);
+    }
+    viewportSyncFrameRef.current = null;
+    viewportSyncUntilRef.current = 0;
+  }, []);
+  const nudgeViewportSync = useCallback((durationMs = 160) => {
+    if (typeof window === "undefined") return;
+    const now = window.performance.now();
+    viewportSyncUntilRef.current = Math.max(viewportSyncUntilRef.current, now + durationMs);
+    if (viewportSyncFrameRef.current != null) return;
+    const tick = () => {
+      setViewportVersion((v) => v + 1);
+      if (window.performance.now() < viewportSyncUntilRef.current) {
+        viewportSyncFrameRef.current = window.requestAnimationFrame(tick);
+      } else {
+        viewportSyncFrameRef.current = null;
+      }
+    };
+    viewportSyncFrameRef.current = window.requestAnimationFrame(tick);
+  }, []);
   const enterDemoTradeFromSignal = useCallback(
     (
       signal: Signal,
@@ -360,6 +414,13 @@ export function ChartPanel({
       const rMultiple =
         overrides.rMultiple ??
         (risk > 0 ? Math.abs(target - signal.price) / risk : undefined);
+      const shouldWaitForRetest =
+        waitForRetest &&
+        !overrides.manual &&
+        supportsRetestEntry(signal) &&
+        overrides.status == null &&
+        overrides.openTime == null &&
+        overrides.armedAt == null;
       const trade: BacktestTrade = {
         id: overrides.id ?? `bt-${signal.setup ?? "ict"}-${signal.time}-${Math.random().toString(36).slice(2, 6)}`,
         direction: overrides.direction ?? signal.direction,
@@ -375,18 +436,20 @@ export function ChartPanel({
         partialFraction,
         partialHit: overrides.partialHit ?? false,
         partialRealized: overrides.partialRealized,
-        openTime: overrides.openTime ?? signal.time,
+        openTime: overrides.openTime ?? (shouldWaitForRetest ? undefined : signal.time),
         positionSize,
         sessionLabel: overrides.sessionLabel ?? signal.session ?? undefined,
         biasLabel: overrides.biasLabel ?? signal.bias ?? undefined,
-        status: overrides.status ?? "active",
+        armedAt: overrides.armedAt ?? (shouldWaitForRetest ? signal.time : undefined),
+        expiresAt: overrides.expiresAt ?? (shouldWaitForRetest ? signal.time + retestWindowMs : undefined),
+        status: overrides.status ?? (shouldWaitForRetest ? "planned" : "active"),
         ...overrides,
       };
       addTrade(trade);
       seenSignalIdsRef.current.add(signalId);
       return trade;
     },
-    [addTrade, buildSignalId],
+    [addTrade, buildSignalId, retestWindowMs, supportsRetestEntry, waitForRetest],
   );
   const runAutoBacktest = () => {
     if (!backtest?.enabled || !patchBacktest) {
@@ -425,6 +488,7 @@ export function ChartPanel({
     let balanceDelta = 0;
     let added = 0;
     for (const signal of relevantSignals) {
+      const shouldWaitForRetestEntry = waitForRetest && supportsRetestEntry(signal);
       const stop =
         signal.stop ??
         (signal.direction === "buy" ? signal.price * (1 - 0.001) : signal.price * (1 + 0.001));
@@ -455,10 +519,18 @@ export function ChartPanel({
         risk,
         takePartial,
         partialFraction,
-        openTime: signal.time,
+        openTime: shouldWaitForRetestEntry ? undefined : signal.time,
         positionSize,
+        armedAt: shouldWaitForRetestEntry ? signal.time : undefined,
+        expiresAt: shouldWaitForRetestEntry ? signal.time + retestWindowMs : undefined,
+        status: shouldWaitForRetestEntry ? "planned" : "active",
       };
-      const outcome = simulateTradeOutcome(signal, tradeBase, backtestCandles, startIdx, endIdx);
+      const outcome = simulateTradeOutcome(signal, tradeBase, backtestCandles, startIdx, endIdx, {
+        waitForRetest: shouldWaitForRetestEntry,
+      });
+      if (shouldWaitForRetestEntry && outcome.openTime == null) {
+        continue;
+      }
       const trade = enterDemoTradeFromSignal(
         signal,
         {
@@ -639,7 +711,37 @@ export function ChartPanel({
   }, [datasetKey, signalStorageKey]);
 
   useEffect(() => {
-    if (!notificationsEnabled) {
+    onSignalPromptChange?.(signalPrompt, signalPromptScore);
+  }, [signalPrompt, signalPromptScore, onSignalPromptChange]);
+
+  useEffect(() => {
+    return () => {
+      onSignalPromptChange?.(null, null);
+    };
+  }, [onSignalPromptChange]);
+
+  useEffect(() => {
+    if (dismissSignalPromptToken == null) return;
+    if (dismissSignalPromptTokenRef.current === dismissSignalPromptToken) return;
+    dismissSignalPromptTokenRef.current = dismissSignalPromptToken;
+    setSignalPrompt(null);
+    setSignalPromptScore(null);
+  }, [dismissSignalPromptToken]);
+
+  useEffect(() => {
+    if (takeSignalPromptToken == null) return;
+    if (takeSignalPromptTokenRef.current === takeSignalPromptToken) return;
+    takeSignalPromptTokenRef.current = takeSignalPromptToken;
+    if (signalPrompt) {
+      enterDemoTradeFromSignal(signalPrompt, {}, true);
+    }
+    setSignalPrompt(null);
+    setSignalPromptScore(null);
+  }, [enterDemoTradeFromSignal, signalPrompt, takeSignalPromptToken]);
+
+  useEffect(() => {
+    const wantsAuto = Boolean(backtest?.autoTrade);
+    if (!notificationsEnabled && !wantsAuto) {
       setAlertStatus(null);
       return;
     }
@@ -651,32 +753,58 @@ export function ChartPanel({
       });
       return;
     }
+    if (!alertRelayConfigured && !wantsAuto) {
+      setAlertStatus({
+        status: "paused",
+        message: "Relay adapter not configured. Chart entries are local only.",
+        detail: "Set ALERT_WEBHOOK_URL or ALERT_EXECUTION_URL, and optionally NEXT_PUBLIC_ALERT_RELAY_MODE for the UI badge.",
+        since: Date.now(),
+      });
+      return;
+    }
     const latestTime = candles.at(-1)?.t ?? null;
     const lastSignalTime = lastSignal?.time ?? null;
     if (!latestTime || !lastSignalTime) {
       setAlertStatus({
         status: "stale",
-        message: "Awaiting first entry alert…",
+        message: "Awaiting first actionable entry alert…",
         since: Date.now(),
       });
       return;
     }
-    const ageHours = (latestTime - lastSignalTime) / (60 * 60 * 1000);
-    if (ageHours >= 8) {
+    const signalIsCurrent = lastSignalTime === latestTime;
+    const signalAgeMs = Math.max(0, latestTime - lastSignalTime);
+    if (!signalIsCurrent) {
       setAlertStatus({
         status: "stale",
-        message: `No entry alerts in ${ageHours.toFixed(1)}h`,
-        detail: `Last alert ${new Date(lastSignalTime).toLocaleString()}`,
+        message: "Latest signal is historical and no longer actionable.",
+        detail: "The bot only announces or auto-trades signals on the current candle. It does not enter retroactively on prior candles.",
+        since: lastSignalTime,
+      });
+    } else if (signalAgeMs > staleSignalThreshold) {
+      setAlertStatus({
+        status: "stale",
+        message: "Latest signal is historical and no longer actionable.",
+        detail: "Only the newest fresh signal is eligible for relay or auto-trade. Older chart signals remain visible for review.",
         since: lastSignalTime,
       });
     } else {
       setAlertStatus({
         status: "live",
-        message: `Alerts live · last ${new Date(lastSignalTime).toLocaleTimeString()}`,
+        message: `${alertRelayConfigured ? `${alertRelayLabel} adapter live` : "Auto-trade relay live"} · latest signal is actionable`,
+        detail: "Only the newest fresh signal is relayed. Historical chart entries do not trigger the bot retroactively.",
         since: lastSignalTime,
       });
     }
-  }, [notificationsEnabled, backtest?.enabled, candles, lastSignal?.time, setAlertStatus]);
+  }, [
+    notificationsEnabled,
+    backtest?.enabled,
+    backtest?.autoTrade,
+    candles,
+    lastSignal?.time,
+    setAlertStatus,
+    staleSignalThreshold,
+  ]);
 
   useEffect(() => {
     const next = new Set<string>();
@@ -743,11 +871,30 @@ export function ChartPanel({
     trades.forEach((trade) => {
       const status = trade.status ?? (trade.result ? "closed" : "active");
       if (status === "planned") {
-        if (trade.manual && trade.entry != null) {
-          const entryHit = latest.l <= trade.entry && latest.h >= trade.entry;
-          if (entryHit) {
-            updateTrade(trade.id, { status: "active", openTime: latest.t });
-          }
+        if (trade.expiresAt != null && latest.t > trade.expiresAt) {
+          updateTrade(trade.id, {
+            status: "canceled",
+            exitTime: latest.t,
+            armedAt: undefined,
+            expiresAt: undefined,
+          });
+          return;
+        }
+        if (trade.entry == null) {
+          return;
+        }
+        const canActivate = trade.armedAt == null || latest.t > trade.armedAt;
+        if (!canActivate) {
+          return;
+        }
+        const entryHit = latest.l <= trade.entry && latest.h >= trade.entry;
+        if (entryHit) {
+          updateTrade(trade.id, {
+            status: "active",
+            openTime: latest.t,
+            armedAt: undefined,
+            expiresAt: undefined,
+          });
         }
         return;
       }
@@ -1229,6 +1376,111 @@ export function ChartPanel({
     );
   };
 
+  const renderActiveSignalGuide = () => {
+    if (!signalPrompt || !chartRef.current || !seriesRef.current || chartWidth <= 0 || chartHeight <= 0) {
+      return null;
+    }
+    const entryY = priceToYCoord(signalPrompt.price);
+    if (entryY == null) return null;
+    const stopPrice = signalPrompt.stop ?? null;
+    const targetPrice = signalPrompt.tp1 ?? signalPrompt.tp2 ?? signalPrompt.tp3 ?? signalPrompt.tp4 ?? null;
+    const stopY = stopPrice != null ? priceToYCoord(stopPrice) : null;
+    const targetY = targetPrice != null ? priceToYCoord(targetPrice) : null;
+    const rawAnchorX = timeToXCoord(signalPrompt.time);
+    const anchorX =
+      rawAnchorX != null
+        ? clamp(rawAnchorX, 10, Math.max(10, chartWidth - 140))
+        : Math.max(10, chartWidth - 180);
+    const zoneLeft = clamp(anchorX + 12, 8, Math.max(8, chartWidth - 180));
+    const zoneWidth = Math.max(124, chartWidth - zoneLeft - 10);
+    const bullish = signalPrompt.direction === "buy";
+    const accent = bullish ? "rgba(74,222,128,0.96)" : "rgba(251,146,60,0.96)";
+    const accentBg = bullish ? "rgba(6,78,59,0.88)" : "rgba(124,45,18,0.88)";
+    const stopBorder = "rgba(248,113,113,0.92)";
+    const stopFill = "rgba(248,113,113,0.18)";
+    const targetBorder = bullish ? "rgba(45,212,191,0.92)" : "rgba(250,204,21,0.92)";
+    const targetFill = bullish ? "rgba(16,185,129,0.18)" : "rgba(249,115,22,0.18)";
+    const headerLeft = clamp(anchorX + 14, 8, Math.max(8, chartWidth - 220));
+    const headerTop = clamp(entryY - 52, 8, Math.max(8, chartHeight - 58));
+    const rr =
+      stopPrice != null && targetPrice != null
+        ? calcRMultiple(signalPrompt.price, stopPrice, targetPrice, signalPrompt.direction)
+        : null;
+    const title = `${bullish ? "Actionable Buy" : "Actionable Sell"}${
+      signalPromptScore != null ? ` • ${signalPromptScore.toFixed(0)}%` : ""
+    }`;
+    const setupLabel = signalPrompt.setup ?? (bullish ? "Buy setup" : "Sell setup");
+
+    return (
+      <div className="pointer-events-none absolute inset-0 z-[24]">
+        {rawAnchorX != null && (
+          <div
+            className="absolute top-0 bottom-0 border-l border-dashed opacity-75"
+            style={{ left: anchorX, borderColor: accent }}
+          />
+        )}
+        <div
+          className="absolute left-0 right-0 border-t border-dashed opacity-90"
+          style={{ top: entryY, borderColor: accent }}
+        />
+        <div
+          className="absolute right-2 z-[25] -translate-y-1/2 rounded px-2 py-1 text-[10px] font-semibold text-white shadow-lg"
+          style={{
+            top: entryY,
+            backgroundColor: accentBg,
+            boxShadow: `0 10px 28px ${accentBg}`,
+          }}
+        >
+          Entry {formatPrice(signalPrompt.price)}
+        </div>
+        {stopY != null && (
+          <div
+            className="absolute rounded border text-[10px] text-white shadow-sm"
+            style={{
+              left: zoneLeft,
+              width: zoneWidth,
+              top: Math.min(entryY, stopY),
+              height: Math.max(2, Math.abs(entryY - stopY)),
+              backgroundColor: stopFill,
+              borderColor: stopBorder,
+            }}
+          >
+            <div className="absolute left-2 top-1 rounded bg-black/45 px-1.5 py-0.5">
+              SL {formatPrice(stopPrice!)}
+            </div>
+          </div>
+        )}
+        {targetY != null && (
+          <div
+            className="absolute rounded border text-[10px] text-white shadow-sm"
+            style={{
+              left: zoneLeft,
+              width: zoneWidth,
+              top: Math.min(entryY, targetY),
+              height: Math.max(2, Math.abs(entryY - targetY)),
+              backgroundColor: targetFill,
+              borderColor: targetBorder,
+            }}
+          >
+            <div className="absolute left-2 top-1 rounded bg-black/45 px-1.5 py-0.5">
+              TP1 {formatPrice(targetPrice!)}
+              {rr != null && Number.isFinite(rr) ? ` • ${rr.toFixed(2)}R` : ""}
+            </div>
+          </div>
+        )}
+        <div
+          className="absolute z-[25] rounded border bg-slate-950/90 px-2 py-1 text-[10px] text-white shadow-lg"
+          style={{ left: headerLeft, top: headerTop, borderColor: accent }}
+        >
+          <div className="font-semibold uppercase tracking-wide" style={{ color: bullish ? "#86efac" : "#fdba74" }}>
+            {title}
+          </div>
+          <div className="mt-0.5 text-zinc-300">{setupLabel}</div>
+        </div>
+      </div>
+    );
+  };
+
   const renderDrawingShape = (drawing: Drawing, key: string, opts: { preview?: boolean } = {}) => {
     if (!chartRef.current || !seriesRef.current) return null;
     const preview = opts.preview ?? false;
@@ -1572,6 +1824,31 @@ export function ChartPanel({
     };
   }, []);
 
+  useEffect(() => () => stopViewportSync(), [stopViewportSync]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof window === "undefined") return;
+    const handlePointerDown = () => nudgeViewportSync(260);
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.buttons !== 0) {
+        nudgeViewportSync(120);
+      }
+    };
+    const handlePointerUp = () => nudgeViewportSync(90);
+    const handleWheel = () => nudgeViewportSync(220);
+    el.addEventListener("pointerdown", handlePointerDown, { passive: true });
+    el.addEventListener("wheel", handleWheel, { passive: true });
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    window.addEventListener("pointerup", handlePointerUp, { passive: true });
+    return () => {
+      el.removeEventListener("pointerdown", handlePointerDown);
+      el.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [nudgeViewportSync]);
+
   useEffect(() => {
     if (!seriesRef.current) return;
     seriesRef.current.setData(
@@ -1630,7 +1907,7 @@ export function ChartPanel({
 
       setTimelineTicks(ticks);
     }
-  }, [candles, chartWidth, clockTz]);
+  }, [candles, chartWidth, clockTz, viewportVersion]);
 
   useEffect(() => {
     if (!overlays.sessions || candles.length < 2) {
@@ -1686,7 +1963,7 @@ export function ChartPanel({
       })
       .filter((b) => Number.isFinite(b.left) && Number.isFinite(b.width));
     setSessionBands(bands);
-  }, [overlays.sessions, candles, chartWidth]);
+  }, [overlays.sessions, candles, chartWidth, viewportVersion]);
 
   useEffect(() => {
     if (!overlays.killzones || candles.length < 2) {
@@ -1748,7 +2025,7 @@ export function ChartPanel({
       })
       .filter((b) => Number.isFinite(b.left) && Number.isFinite(b.width));
     setKillZoneBands(bands);
-  }, [overlays.killzones, candles, chartWidth]);
+  }, [overlays.killzones, candles, chartWidth, viewportVersion]);
 
   useEffect(() => {
     if (!markersPluginRef.current) return;
@@ -2141,11 +2418,16 @@ export function ChartPanel({
       const segs: Array<{ id: string; x1: number; x2: number; y: number; label: string; color: string }> = [];
       const recent = equalHighsLows.slice(-6);
       recent.forEach((lvl, idx) => {
-        const timesForLevel = sweeps
-          ?.filter((s) => s.price === lvl.price)
-          ?.map((s) => s.time) ?? [];
-        const t1 = timesForLevel.at(0) ?? candles.at(-2)?.t ?? lvl.times[0];
-        const t2 = timesForLevel.at(-1) ?? candles.at(-1)?.t ?? lvl.times.at(-1) ?? t1;
+        const levelTimes = Array.from(new Set(lvl.times.filter(Number.isFinite))).sort((a, b) => a - b);
+        if (levelTimes.length === 0) return;
+        const sweepTimes =
+          sweeps
+            ?.filter((s) => priceMatchesLevel(s.price, lvl.price))
+            .map((s) => s.time)
+            .filter((time) => time >= levelTimes[0])
+            .sort((a, b) => a - b) ?? [];
+        const t1 = levelTimes[0];
+        const t2 = sweepTimes.at(-1) ?? levelTimes.at(-1) ?? t1;
         const x1 = timeToX(t1);
         const x2 = timeToX(t2);
         const y = priceToY(lvl.price);
@@ -2450,6 +2732,7 @@ export function ChartPanel({
     const isCurrent = latest.time === latestTime;
     const signalAgeMs = latestTime ? Math.max(0, latestTime - latest.time) : 0;
     const signalIsFresh = signalAgeMs <= staleSignalThreshold;
+    const shouldAnnounceSignal = isCurrent && signalIsFresh;
     const isNewSignal =
       lastPromptedSignalRef.current == null || latest.time > lastPromptedSignalRef.current;
     const showPrompt = () => {
@@ -2465,31 +2748,76 @@ export function ChartPanel({
       const shouldNotify = notificationsEnabled && !backtest?.enabled && signalIsFresh;
       const shouldAutoTrade = Boolean(backtest?.autoTrade) && signalIsFresh;
       if (shouldNotify) {
-        notifyAlertConnectors(latest, {
+        void notifyAlertConnectors(latest, {
           symbol,
           timeframe,
           bias,
           price: latestPrice ?? latest.price,
           session: latest.session ?? null,
           source: dataSource,
+        }).then((result) => {
+          pushAlertRelayEvent({
+            signalTime: latest.time,
+            direction: latest.direction,
+            setup: latest.setup,
+            channel: result.channel,
+            deliveryStatus: result.deliveryStatus,
+            ackStatus: result.ackStatus,
+            acceptanceStatus: result.acceptanceStatus,
+            detail: result.detail,
+            lastResponse: result.lastResponse,
+          });
         });
       }
       if (shouldAutoTrade) {
-        enterDemoTradeFromSignal(latest);
+        const trade = enterDemoTradeFromSignal(latest);
+          pushAlertRelayEvent({
+            signalTime: latest.time,
+            direction: latest.direction,
+            setup: latest.setup,
+            channel: 'auto-trade',
+            deliveryStatus: trade ? (trade.status === "planned" ? 'armed' : 'executed') : 'skipped',
+            ackStatus: 'not-applicable',
+            acceptanceStatus: trade ? 'accepted' : 'not-applicable',
+            detail: trade
+              ? trade.status === "planned"
+                ? 'Paper trade armed from fresh signal. Waiting for retest.'
+                : 'Paper trade opened from fresh signal.'
+              : 'Signal was already consumed or blocked.',
+            lastResponse: null,
+          });
+      } else if (Boolean(backtest?.autoTrade)) {
+        pushAlertRelayEvent({
+          signalTime: latest.time,
+          direction: latest.direction,
+          setup: latest.setup,
+          channel: 'auto-trade',
+          deliveryStatus: 'skipped',
+          ackStatus: 'not-applicable',
+          acceptanceStatus: 'not-applicable',
+          detail: signalIsFresh ? 'Auto trade is enabled, but this signal was not eligible.' : 'Signal is stale and was not auto-executed.',
+          lastResponse: null,
+        });
       }
     };
     if (isNewSignal) {
-      if (!signalIsFresh && lastPromptedSignalRef.current == null) {
+      if (!shouldAnnounceSignal) {
         persistLastPromptedSignal(latest.time);
         setSignalPrompt(null);
         setSignalPromptScore(null);
         return;
       }
       showPrompt();
-    } else if (backtest?.enabled && !isCurrent && signalPrompt && signalPrompt.time > latest.time) {
-      // If stepping backward, restore previous prompt
+    } else if (backtest?.enabled && isCurrent && signalPrompt && signalPrompt.time > latest.time) {
+      // If stepping backward to an earlier signal candle, restore that prompt.
       setSignalPrompt(latest);
-      setSignalPromptScore(null);
+      const evalResult = evaluateIctScanner({
+        signal: latest,
+        bias,
+        premiumDiscount,
+        latestPrice: latestPrice ?? latest.price,
+      });
+      setSignalPromptScore(evalResult.score);
     }
   }, [
     promptSignals,
@@ -2502,6 +2830,7 @@ export function ChartPanel({
     backtest?.autoTrade,
     signalPrompt,
     enterDemoTradeFromSignal,
+    pushAlertRelayEvent,
     symbol,
     timeframe,
     dataSource,
@@ -2524,12 +2853,9 @@ export function ChartPanel({
   const panelCursor = panMode ? (isPanning ? "grabbing" : "grab") : drawingMode === "none" ? "default" : "crosshair";
   const overlayCursor = drawingMode === "none" ? "default" : "crosshair";
   const activeTimeLabel = hoverTzTime ?? lastTzTime ?? "—";
-  const signalPromptRMultiple =
-    signalPrompt && signalPrompt.stop && signalPrompt.tp1
-      ? calcRMultiple(signalPrompt.price, signalPrompt.stop, signalPrompt.tp1, signalPrompt.direction)
-      : null;
   const clockLabel = getClockLabel(clockTz);
   const hoverPriceLabel = hoverPrice != null ? formatPrice(hoverPrice) : null;
+  const headerStatusActive = Boolean(dataSource || hoverCandle || backtest?.enabled || notificationsEnabled);
   const manualMenuStyle = manualTradePrompt
     ? (() => {
         const containerWidth = containerRef.current?.clientWidth ?? manualTradePrompt.x + 200;
@@ -2551,53 +2877,116 @@ export function ChartPanel({
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
       <div className="shrink-0 border-b border-white/10 bg-[#060b18]/90 px-3 py-2">
-        <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          <div
-            className="mx-auto flex min-w-max flex-col items-center gap-2 transition-transform duration-200"
-            style={{ transform: `translateX(${toolbarShift}px)` }}
-          >
-            <div className="flex flex-wrap items-center justify-center gap-2 rounded-full border border-white/10 bg-[#0b1220]/95 px-2 py-1 shadow-[0_14px_34px_rgba(0,0,0,0.35)]">
-              <button
-                className={clsx(
-                  "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
-                  panMode
-                    ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-200"
-                    : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700",
-                )}
-                onClick={togglePanMode}
-                title="Pan chart"
-              >
-                ✋ Pan
-              </button>
-              {DRAWING_TOOLBAR_TOOLS.map((tool) => (
+        <div className="relative flex flex-col gap-2">
+          <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div
+              className="mx-auto flex min-w-max flex-col items-center gap-2 transition-transform duration-200"
+              style={{ transform: `translateX(${toolbarShift}px)` }}
+            >
+              <div className="flex flex-wrap items-center justify-center gap-2 rounded-full border border-white/10 bg-[#0b1220]/95 px-2 py-1 shadow-[0_14px_34px_rgba(0,0,0,0.35)]">
                 <button
-                  key={tool.mode}
                   className={clsx(
                     "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
-                    drawingMode === tool.mode
+                    panMode
                       ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-200"
                       : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700",
                   )}
-                  onClick={() => setDrawingMode(drawingMode === tool.mode ? "none" : tool.mode)}
-                  title={tool.title}
+                  onClick={togglePanMode}
+                  title="Pan chart"
                 >
-                  <span className="hidden sm:inline">{tool.label}</span>
-                  <span className="sm:hidden">{tool.shortLabel}</span>
+                  ✋ Pan
                 </button>
-              ))}
-              {drawings.length > 0 && (
-                <button
-                  className="rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] font-semibold text-zinc-300 transition hover:border-rose-500/50 hover:text-rose-200"
-                  onClick={clearDrawings}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <div className="text-center text-[10px] text-zinc-400">
-              {drawingHint}
+                {DRAWING_TOOLBAR_TOOLS.map((tool) => (
+                  <button
+                    key={tool.mode}
+                    className={clsx(
+                      "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
+                      drawingMode === tool.mode
+                        ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-200"
+                        : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700",
+                    )}
+                    onClick={() => setDrawingMode(drawingMode === tool.mode ? "none" : tool.mode)}
+                    title={tool.title}
+                  >
+                    <span className="hidden sm:inline">{tool.label}</span>
+                    <span className="sm:hidden">{tool.shortLabel}</span>
+                  </button>
+                ))}
+                {drawings.length > 0 && (
+                  <button
+                    className="rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] font-semibold text-zinc-300 transition hover:border-rose-500/50 hover:text-rose-200"
+                    onClick={clearDrawings}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="text-center text-[10px] text-zinc-400">
+                {drawingHint}
+              </div>
             </div>
           </div>
+          {headerStatusActive && (
+            <div className="flex flex-wrap justify-end gap-1.5 lg:absolute lg:right-0 lg:top-0 lg:max-w-[28rem] lg:flex-col lg:items-end">
+              {dataSource && (
+                <div className="w-fit max-w-full rounded bg-black/70 px-2 py-1 text-[11px] text-zinc-200 shadow">
+                  Data: {dataSource}
+                </div>
+              )}
+              {hoverCandle && (
+                <div className="w-fit max-w-full rounded bg-black/70 px-2 py-1 text-[10px] text-white shadow">
+                  <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-right">
+                    <span>
+                      <span className="text-sky-300">O</span> {formatPrice(hoverCandle.o)}
+                    </span>
+                    <span>
+                      <span className="text-emerald-300">H</span> {formatPrice(hoverCandle.h)}
+                    </span>
+                    <span>
+                      <span className="text-rose-300">L</span> {formatPrice(hoverCandle.l)}
+                    </span>
+                    <span>
+                      <span className="text-amber-200">C</span> {formatPrice(hoverCandle.c)}
+                    </span>
+                  </div>
+                </div>
+              )}
+              {backtest?.enabled && (
+                <div className="w-fit max-w-full rounded bg-emerald-900/70 px-2 py-1 text-[10px] text-emerald-100 shadow">
+                  Backtest • {backtestCurrent ?? 0}
+                  {backtestTotal ? ` / ${backtestTotal}` : ''}{' '}
+                  <span className="text-emerald-300">{backtest?.playing ? 'Playing' : 'Paused'}</span>
+                </div>
+              )}
+              {notificationsEnabled && (
+                <div
+                  className="w-fit max-w-full rounded px-2 py-1 text-[10px] text-right shadow"
+                  style={{
+                    backgroundColor:
+                      alertStatus?.status === "live"
+                        ? "rgba(16,185,129,0.2)"
+                        : alertStatus?.status === "paused"
+                          ? "rgba(251,191,36,0.2)"
+                          : "rgba(248,113,113,0.2)",
+                    color:
+                      alertStatus?.status === "live"
+                        ? "#bbf7d0"
+                        : alertStatus?.status === "paused"
+                          ? "#fde68a"
+                          : "#fecaca",
+                  }}
+                >
+                  {alertStatus?.message ?? "Entry alerts enabled"}
+                  {alertStatus?.detail ? (
+                    <>
+                      <br />
+                      <span className="text-[9px] opacity-80">{alertStatus.detail}</span>
+                    </>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       <div
@@ -2699,67 +3088,6 @@ export function ChartPanel({
             ))}
           </div>
         )}
-        {(dataSource || hoverCandle || backtest?.enabled || notificationsEnabled) && (
-          <div className="pointer-events-none absolute left-2 top-2 z-30 space-y-1 text-[11px]">
-            {dataSource && (
-              <div className="rounded bg-black/70 px-2 py-1 text-[11px] text-zinc-200 shadow">
-                Data: {dataSource}
-              </div>
-            )}
-            {hoverCandle && (
-              <div className="rounded bg-black/70 px-2 py-1 text-[10px] text-white shadow">
-                <div className="flex flex-wrap gap-x-3 gap-y-1">
-                  <span>
-                    <span className="text-sky-300">O</span> {formatPrice(hoverCandle.o)}
-                  </span>
-                  <span>
-                    <span className="text-emerald-300">H</span> {formatPrice(hoverCandle.h)}
-                  </span>
-                  <span>
-                    <span className="text-rose-300">L</span> {formatPrice(hoverCandle.l)}
-                  </span>
-                  <span>
-                    <span className="text-amber-200">C</span> {formatPrice(hoverCandle.c)}
-                  </span>
-                </div>
-              </div>
-            )}
-            {backtest?.enabled && (
-              <div className="rounded bg-emerald-900/70 px-2 py-1 text-[10px] text-emerald-100 shadow">
-                Backtest • {backtestCurrent ?? 0}
-                {backtestTotal ? ` / ${backtestTotal}` : ''}{' '}
-                <span className="text-emerald-300">{backtest?.playing ? 'Playing' : 'Paused'}</span>
-              </div>
-            )}
-            {notificationsEnabled && (
-              <div
-                className="rounded px-2 py-1 text-[10px] shadow"
-                style={{
-                  backgroundColor:
-                    alertStatus?.status === "live"
-                      ? "rgba(16,185,129,0.2)"
-                      : alertStatus?.status === "paused"
-                        ? "rgba(251,191,36,0.2)"
-                        : "rgba(248,113,113,0.2)",
-                  color:
-                    alertStatus?.status === "live"
-                      ? "#bbf7d0"
-                      : alertStatus?.status === "paused"
-                        ? "#fde68a"
-                        : "#fecaca",
-                }}
-              >
-                {alertStatus?.message ?? "Entry alerts enabled"}
-                {alertStatus?.detail ? (
-                  <>
-                    <br />
-                    <span className="text-[9px] opacity-80">{alertStatus.detail}</span>
-                  </>
-                ) : null}
-              </div>
-            )}
-          </div>
-        )}
         {hoverPoint && (
           <div className="pointer-events-none absolute inset-0 z-30">
             <div
@@ -2778,6 +3106,7 @@ export function ChartPanel({
             {hoverPriceLabel}
           </div>
         )}
+        {renderActiveSignalGuide()}
         {manualTradePrompt && manualMenuStyle && (
           <div
             ref={manualMenuRef}
@@ -2813,123 +3142,6 @@ export function ChartPanel({
             </button>
           </div>
         )}
-    {signalPrompt && (
-      <div className="pointer-events-auto absolute top-3 right-3 z-40 w-72 rounded border border-emerald-500/40 bg-black/85 p-3 text-xs text-white shadow-lg shadow-black/60">
-        <div className="mb-1 flex items-center justify-between text-sm font-semibold text-emerald-200">
-          <span>ICT setup ready</span>
-          <button
-            className="text-zinc-400 transition hover:text-red-300"
-            onClick={() => {
-              setSignalPrompt(null);
-              setSignalPromptScore(null);
-            }}
-            aria-label="Dismiss setup prompt"
-          >
-            ✕
-          </button>
-        </div>
-        <div className="flex items-center justify-between text-sm font-semibold">
-          <span className={signalPrompt.direction === "buy" ? "text-emerald-300" : "text-red-300"}>
-            {signalPrompt.direction === "buy" ? "Buy" : "Sell"}
-          </span>
-          <span className="text-[11px] text-zinc-400">
-            {formatFullDate((signalPrompt.time / 1000) as UTCTimestamp, clockTz)}
-          </span>
-        </div>
-        <div className="mt-1 text-sm text-white">
-          <span className="text-sky-300">Entry</span>{' '}
-          <span className="text-sky-200">~ {signalPrompt.price.toFixed(4)}</span>
-          {signalPrompt.setup && (
-            <span className="ml-2 rounded bg-zinc-800 px-1 py-[1px] text-[10px] text-zinc-300">{signalPrompt.setup}</span>
-          )}
-        </div>
-        <div className="mt-2 space-y-1 text-[11px] text-zinc-200">
-          {signalPrompt.stop && (
-            <div className="text-red-300">
-              SL: <span className="text-red-100">{signalPrompt.stop.toFixed(4)}</span>
-            </div>
-          )}
-          {signalPrompt.tp1 && (
-            <div className="text-emerald-300">
-              TP1: <span className="text-emerald-100">{signalPrompt.tp1.toFixed(4)}</span>
-            </div>
-          )}
-          {signalPrompt.tp2 && (
-            <div className="text-emerald-300">
-              TP2: <span className="text-emerald-100">{signalPrompt.tp2.toFixed(4)}</span>
-            </div>
-          )}
-          {signalPrompt.tp3 && (
-            <div className="text-emerald-300">
-              TP3: <span className="text-emerald-100">{signalPrompt.tp3.toFixed(4)}</span>
-            </div>
-          )}
-          {signalPrompt.tp4 && (
-            <div className="text-emerald-300">
-              TP4: <span className="text-emerald-100">{signalPrompt.tp4.toFixed(4)}</span>
-            </div>
-          )}
-          {signalPromptRMultiple != null && (
-            <div className="text-emerald-300">R/R ≈ {signalPromptRMultiple.toFixed(2)}R</div>
-          )}
-          <div className="text-zinc-400">{signalPrompt.basis}</div>
-        </div>
-        <div className="mt-2 text-xs text-emerald-200">
-          {signalPromptScore != null ? `Confidence ${signalPromptScore.toFixed(0)}%` : "Evaluating setup..."}
-        </div>
-        <div className="mt-3 flex gap-2 text-[11px]">
-          {backtest?.enabled ? (
-            <>
-              <button
-                className="flex-1 rounded border border-emerald-500/60 bg-emerald-500/10 py-1 font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
-                onClick={() => {
-                  if (signalPrompt) {
-                    enterDemoTradeFromSignal(signalPrompt, {}, true);
-                  }
-                  setSignalPrompt(null);
-                  setSignalPromptScore(null);
-                }}
-              >
-                Enter trade
-              </button>
-              <button
-                className="flex-1 rounded border border-zinc-600 bg-zinc-800/70 py-1 font-semibold text-zinc-200 transition hover:bg-zinc-700"
-                onClick={() => {
-                  setSignalPrompt(null);
-                  setSignalPromptScore(null);
-                }}
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                className="flex-1 rounded border border-emerald-500/60 bg-emerald-500/10 py-1 font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
-                onClick={() => {
-                  if (signalPrompt) {
-                    enterDemoTradeFromSignal(signalPrompt, {}, true);
-                  }
-                  setSignalPrompt(null);
-                  setSignalPromptScore(null);
-                }}
-              >
-                Take trade
-              </button>
-              <button
-                className="flex-1 rounded border border-zinc-600 bg-zinc-800/70 py-1 font-semibold text-zinc-200 transition hover:bg-zinc-700"
-                onClick={() => {
-                  setSignalPrompt(null);
-                  setSignalPromptScore(null);
-                }}
-              >
-                Dismiss
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    )}
     {drawingElements}
     {previewElement}
         {overlays.signals && signalBoxes.length > 0 && (
@@ -3008,7 +3220,7 @@ export function ChartPanel({
             ))}
           </div>
         )}
-        {overlays.sweeps && eqSegments.length > 0 && (
+        {overlays.eqConnectors && eqSegments.length > 0 && (
           <div className="pointer-events-none absolute inset-0 z-[15]">
             {eqSegments.map((seg) => (
               <div
@@ -3329,10 +3541,15 @@ function simulateTradeOutcome(
   candles: Candle[],
   startIdx: number,
   endIdx: number,
-): Pick<BacktestTrade, "result" | "pnl" | "exitTime" | "partialRealized" | "partialHit"> {
-  const idx = candles.findIndex((c) => c.t >= signal.time);
+  options: { waitForRetest?: boolean } = {},
+): Pick<
+  BacktestTrade,
+  "result" | "pnl" | "exitTime" | "partialRealized" | "partialHit" | "openTime" | "status" | "armedAt" | "expiresAt"
+> {
+  const idx = candles.findIndex((c) => c.t > signal.time);
   if (idx === -1) return {};
   const start = Math.max(idx, startIdx);
+  const waitForRetest = options.waitForRetest ?? false;
   let stop = base.stop;
   const target = base.target;
   const entry = base.entry;
@@ -3343,8 +3560,25 @@ function simulateTradeOutcome(
   let partialRealized = base.partialRealized ?? 0;
   let partialHit = base.partialHit ?? false;
   const size = base.positionSize ?? 1;
+  let openTime = base.openTime ?? signal.time;
+  let entered = !waitForRetest;
   for (let i = start; i <= endIdx; i++) {
     const candle = candles[i];
+    if (!entered) {
+      if (base.expiresAt != null && candle.t > base.expiresAt) {
+        return {};
+      }
+      const entryHit = candle.l <= entry && candle.h >= entry;
+      if (!entryHit) {
+        continue;
+      }
+      entered = true;
+      openTime = candle.t;
+      continue;
+    }
+    if (candle.t <= openTime) {
+      continue;
+    }
     if (takePartial != null && !partialHit) {
       const hitPartial = dir === "buy" ? candle.h >= takePartial : candle.l <= takePartial;
       if (hitPartial) {
@@ -3379,11 +3613,29 @@ function simulateTradeOutcome(
           : entry - stop;
     const remainingFraction = partialHit ? 1 - (partialFraction ?? 0.5) : 1;
     const pnl = partialRealized + move * remainingFraction * size;
-    return { result, pnl, exitTime: candle.t, partialRealized, partialHit };
+    return {
+      result,
+      pnl,
+      exitTime: candle.t,
+      partialRealized,
+      partialHit,
+      openTime,
+      status: "closed",
+      armedAt: undefined,
+      expiresAt: undefined,
+    };
   }
-  return partialRealized
-    ? { partialRealized, partialHit }
-    : {};
+  if (!entered) {
+    return {};
+  }
+  return {
+    partialRealized: partialRealized || undefined,
+    partialHit,
+    openTime,
+    status: "active",
+    armedAt: undefined,
+    expiresAt: undefined,
+  };
 }
 
 function formatMeasureLabel(start: { price: number; time: number }, end: { price: number; time: number }) {
@@ -3546,6 +3798,11 @@ function styleForSession(label: string) {
     gradient: "linear-gradient(180deg, rgba(148,163,184,0.16) 0%, rgba(30,41,59,0) 100%)",
     text: "#e2e8f0",
   };
+}
+
+function priceMatchesLevel(a: number, b: number) {
+  const scale = Math.max(1, Math.abs(a), Math.abs(b));
+  return Math.abs(a - b) <= scale * 1e-6;
 }
 
 type OverlayBox = {

@@ -93,6 +93,7 @@ export function InfoDrawer({
         <ul className="list-disc space-y-1 pl-4 text-[13px] text-zinc-300">
           <li>Use Layers ➜ BOS/CHoCH segments to see structure shifts.</li>
           <li>Auto trade requires a fresh signal and Auto trade ON in the chart panel.</li>
+          <li>Retest Mode only applies to zone-based setups; Pullback Reentry, Sweep + Shift, Silver Bullet, and Turtle Soup stay immediate-entry.</li>
           <li>Model 2022 signals come from the 15m FVG logic (see model2022 module).</li>
         </ul>
       </section>
