@@ -231,8 +231,10 @@ export function ChartPanel({
   const [obBoxes, setObBoxes] = useState<OverlayBox[]>([]);
   const [breakerBoxes, setBreakerBoxes] = useState<OverlayBox[]>([]);
   const [pdZones, setPdZones] = useState<OverlayBox[]>([]);
+  const [oteBoxes, setOteBoxes] = useState<OverlayBox[]>([]);
   const [model2022Boxes, setModel2022Boxes] = useState<OverlayBox[]>([]);
   const [signalBoxes, setSignalBoxes] = useState<OverlayBox[]>([]);
+  const [tradeBoxes, setTradeBoxes] = useState<OverlayBox[]>([]);
   const [structureSegments, setStructureSegments] = useState<OverlayBox[]>([]);
   const [eqSegments, setEqSegments] = useState<
     Array<{ id: string; x1: number; x2: number; y: number; label: string; color: string }>
@@ -260,6 +262,15 @@ export function ChartPanel({
   } | null>(null);
   const manualMenuRef = useRef<HTMLDivElement | null>(null);
   const backtestSignalSource = backtestSignals ?? notificationSignals ?? signals;
+  const chartSignals = useMemo(() => {
+    const source = backtest?.enabled
+      ? notificationSignals ?? signals
+      : signals.length
+        ? signals
+        : notificationSignals ?? signals;
+    return source ?? [];
+  }, [backtest?.enabled, notificationSignals, signals]);
+  const chartTrades = useMemo(() => backtest?.trades ?? trades ?? [], [backtest?.trades, trades]);
   const lastSignalFeed = backtestSignals ?? notificationSignals ?? signals;
   const lastSignal =
     lastSignalFeed && lastSignalFeed.length ? lastSignalFeed.at(-1)! : null;
@@ -1779,23 +1790,11 @@ export function ChartPanel({
       );
     }
 
-    if (overlays.fvg && gaps) {
-      markers.push(
-        ...gaps.map((g) => ({
-          time: (g.startTime / 1000) as UTCTimestamp,
-          position: "aboveBar" as const,
-          color: g.type === "bullish" ? "#38bdf8" : "#f59e0b",
-          shape: "square" as const,
-          size: 0.8,
-        })),
-      );
-    }
-
-    if (overlays.signals && signals) {
+    if (overlays.signals && chartSignals.length) {
       const filteredSignals =
         selectedSetup === "all"
-          ? signals
-          : signals.filter((s) => matchesSelectedSetup(s.setup));
+          ? chartSignals
+          : chartSignals.filter((s) => matchesSelectedSetup(s.setup));
       markers.push(
         ...filteredSignals.map((s) => ({
           time: (s.time / 1000) as UTCTimestamp,
@@ -1809,7 +1808,7 @@ export function ChartPanel({
       );
     }
 
-    if (overlays.signals && model2022?.m15Signals?.length) {
+    if (overlays.inversionFvgSignals && model2022?.m15Signals?.length) {
       markers.push(
         ...model2022.m15Signals.map((sig) => ({
           time: (sig.time / 1000) as UTCTimestamp,
@@ -1864,9 +1863,9 @@ export function ChartPanel({
       );
     }
 
-    if (backtest?.trades.length && (overlays.tradeMarkers ?? true)) {
+    if (chartTrades.length && (overlays.tradeMarkers ?? true)) {
       markers.push(
-        ...backtest.trades.map((trade, idx) => ({
+        ...chartTrades.map((trade, idx) => ({
           time: ((trade.openTime ?? candles.at(-1)?.t ?? Date.now()) / 1000) as UTCTimestamp,
           position: trade.direction === 'buy' ? ('belowBar' as const) : ('aboveBar' as const),
           color: trade.direction === 'buy' ? '#10b981' : '#f97316',
@@ -1882,10 +1881,10 @@ export function ChartPanel({
   }, [
     swings,
     gaps,
-    signals,
+    chartSignals,
     structureShifts,
     sweeps,
-    backtest?.trades,
+    chartTrades,
     overlays.liquidity,
     overlays.fvg,
     overlays.signals,
@@ -1909,47 +1908,72 @@ export function ChartPanel({
     const timeToX = (t: number) => timeScale.timeToCoordinate((t / 1000) as UTCTimestamp as any);
     const latestTime = candles.length ? candles[candles.length - 1].t : null;
     const lastVisibleX = latestTime != null ? timeToX(latestTime) : chartWidth ?? null;
+    const candleSlotWidth = estimateCandleSlotWidth(candles, timeToX, chartWidth);
 
     if (overlays.fvg && gaps && chartWidth > 0 && chartHeight > 0) {
       const boxes: typeof fvgBoxes = [];
       gaps.slice(-8).forEach((g, idx) => {
-        const x1 = timeToX(g.startTime);
-        const x2 = timeToX(g.endTime);
-        const yTop = priceToY(Math.max(g.top, g.bottom));
-        const yBot = priceToY(Math.min(g.top, g.bottom));
-        if (x1 == null || x2 == null || yTop == null || yBot == null) return;
-        const left = Math.min(x1, x2);
-        const baseRight = Math.max(x1, x2);
-        const extendedRight = lastVisibleX != null ? Math.max(baseRight, lastVisibleX) : baseRight + 60;
-        const fill =
-          g.type === "bullish"
-            ? "rgba(14,165,233,0.18)"
-            : "rgba(236,72,153,0.18)";
-        const gradient =
-          g.type === "bullish"
-            ? "linear-gradient(180deg, rgba(14,165,233,0.22) 0%, rgba(14,165,233,0.02) 95%)"
-            : "linear-gradient(180deg, rgba(236,72,153,0.22) 0%, rgba(236,72,153,0.02) 95%)";
-        const border =
-          g.type === "bullish"
-            ? "rgba(59,130,246,0.8)"
-            : "rgba(244,114,182,0.8)";
-        const textColor = g.type === "bullish" ? "#bae6fd" : "#fecdd3";
-        boxes.push({
+        const box = buildGapOverlayBox({
           id: `fvg-${idx}-${g.startTime}`,
-          left,
-          width: Math.max(20, extendedRight - left),
-          top: Math.min(yTop, yBot),
-          height: Math.max(2, Math.abs(yTop - yBot)),
-          color: fill,
-          borderColor: border,
-          gradient,
-          textColor,
-          label: `${g.type === "bullish" ? "Bull" : "Bear"} FVG`,
+          gap: g,
+          timeToX,
+          priceToY,
+          candleSlotWidth,
+          color: g.type === "bullish" ? "rgba(14,165,233,0.16)" : "rgba(245,158,11,0.14)",
+          gradient:
+            g.type === "bullish"
+              ? "linear-gradient(180deg, rgba(14,165,233,0.28) 0%, rgba(14,165,233,0.04) 100%)"
+              : "linear-gradient(180deg, rgba(245,158,11,0.24) 0%, rgba(245,158,11,0.04) 100%)",
+          borderColor:
+            g.type === "bullish"
+              ? "rgba(56,189,248,0.95)"
+              : "rgba(251,191,36,0.95)",
+          textColor: g.type === "bullish" ? "#d8f3ff" : "#fef3c7",
+          label: `${g.type === "bullish" ? "Bullish" : "Bearish"} FVG`,
         });
+        if (box) {
+          boxes.push(box);
+        }
       });
       setFvgBoxes((prev) => (areOverlayBoxesEqual(prev, boxes) ? prev : boxes));
     } else {
       setFvgBoxes((prev) => (prev.length ? [] : prev));
+    }
+
+    if (overlays.oteBands && premiumDiscount && chartWidth > 0 && chartHeight > 0) {
+      const dealingRange = premiumDiscount.high - premiumDiscount.low;
+      if (dealingRange > 0) {
+        const oteHigh = premiumDiscount.high - dealingRange * 0.62;
+        const oteLow = premiumDiscount.high - dealingRange * 0.705;
+        const yHigh = priceToY(oteHigh);
+        const yLow = priceToY(oteLow);
+        if (yHigh != null && yLow != null) {
+          const boxes: OverlayBox[] = [
+            {
+              id: "ote-band",
+              left: 0,
+              width: Math.max(10, chartWidth),
+              top: Math.min(yHigh, yLow),
+              height: Math.max(4, Math.abs(yHigh - yLow)),
+              color: "rgba(168,85,247,0.14)",
+              gradient: "linear-gradient(180deg, rgba(168,85,247,0.24) 0%, rgba(168,85,247,0.06) 100%)",
+              borderColor: "rgba(196,181,253,0.9)",
+              textColor: "#f3e8ff",
+              label: "OTE 62% - 70.5%",
+              showLabel: true,
+              guideColor: "rgba(196,181,253,0.45)",
+              midlineColor: "rgba(233,213,255,0.65)",
+            },
+          ];
+          setOteBoxes((prev) => (areOverlayBoxesEqual(prev, boxes) ? prev : boxes));
+        } else {
+          setOteBoxes((prev) => (prev.length ? [] : prev));
+        }
+      } else {
+        setOteBoxes((prev) => (prev.length ? [] : prev));
+      }
+    } else {
+      setOteBoxes((prev) => (prev.length ? [] : prev));
     }
 
     if (overlays.pdZones && premiumDiscount && chartWidth > 0 && chartHeight > 0) {
@@ -2085,36 +2109,28 @@ export function ChartPanel({
       setBreakerBoxes((prev) => (prev.length ? [] : prev));
     }
 
-    if (model2022?.m15Signals?.length && chartWidth > 0 && chartHeight > 0) {
+    if (overlays.inversionFvgSignals && model2022?.m15Signals?.length && chartWidth > 0 && chartHeight > 0) {
       const boxes: typeof model2022Boxes = [];
       model2022.m15Signals.slice(-4).forEach((sig, idx) => {
-        const g = sig.fvg;
-        const x1 = timeToX(g.startTime);
-        const x2 = timeToX(g.endTime);
-        const yTop = priceToY(Math.max(g.top, g.bottom));
-        const yBot = priceToY(Math.min(g.top, g.bottom));
-        if (x1 == null || x2 == null || yTop == null || yBot == null) return;
-        const left = Math.min(x1, x2);
-        const baseRight = Math.max(x1, x2);
-        const extendedRight = lastVisibleX != null ? Math.max(baseRight, lastVisibleX) : baseRight + 60;
-        const fill = sig.direction === "buy" ? "rgba(16,185,129,0.18)" : "rgba(249,115,22,0.2)";
-        const gradient =
-          sig.direction === "buy"
-            ? "linear-gradient(180deg, rgba(16,185,129,0.25) 0%, rgba(16,185,129,0.05) 95%)"
-            : "linear-gradient(180deg, rgba(249,115,22,0.28) 0%, rgba(249,115,22,0.05) 95%)";
-        const border = sig.direction === "buy" ? "rgba(34,211,238,0.9)" : "rgba(251,191,36,0.95)";
-        boxes.push({
-          id: `m22-box-${idx}-${g.startTime}`,
-          left,
-          width: Math.max(20, extendedRight - left),
-          top: Math.min(yTop, yBot),
-          height: Math.max(2, Math.abs(yTop - yBot)),
-          color: fill,
-          borderColor: border,
-          gradient,
+        const box = buildGapOverlayBox({
+          id: `m22-box-${idx}-${sig.fvg.startTime}`,
+          gap: sig.fvg,
+          timeToX,
+          priceToY,
+          candleSlotWidth,
+          color: sig.direction === "buy" ? "rgba(16,185,129,0.18)" : "rgba(249,115,22,0.18)",
+          gradient:
+            sig.direction === "buy"
+              ? "linear-gradient(180deg, rgba(16,185,129,0.26) 0%, rgba(16,185,129,0.05) 100%)"
+              : "linear-gradient(180deg, rgba(249,115,22,0.28) 0%, rgba(249,115,22,0.05) 100%)",
+          borderColor: sig.direction === "buy" ? "rgba(45,212,191,0.95)" : "rgba(251,191,36,0.95)",
           textColor: "#f8fafc",
           label: sig.label,
         });
+        if (box) {
+          box.showLabel = true;
+          boxes.push(box);
+        }
       });
       setModel2022Boxes((prev) => (areOverlayBoxesEqual(prev, boxes) ? prev : boxes));
     } else {
@@ -2156,12 +2172,12 @@ export function ChartPanel({
       setEqSegments((prev) => (prev.length ? [] : prev));
     }
 
-    if (overlays.signals && signals && chartWidth > 0 && chartHeight > 0) {
+    if (overlays.signals && chartSignals.length && chartWidth > 0 && chartHeight > 0) {
       const boxes: OverlayBox[] = [];
       const filtered =
         selectedSetup === "all"
-          ? signals.slice(-12)
-          : signals.filter((s) => matchesSelectedSetup(s.setup)).slice(-12);
+          ? chartSignals.slice(-12)
+          : chartSignals.filter((s) => matchesSelectedSetup(s.setup)).slice(-12);
       filtered.forEach((s, idx) => {
         const x = timeToX(s.time);
         const y = priceToY(s.price);
@@ -2169,8 +2185,12 @@ export function ChartPanel({
         const width = 118;
         const height = 22;
         const left = clamp(x - width / 2, 4, Math.max(4, (chartWidth || width) - width - 4));
-        const top = clamp(y - height - 6, 4, Math.max(4, (chartHeight || height) - height - 4));
         const bullish = s.direction === "buy";
+        const top = clamp(
+          bullish ? y + 8 : y - height - 8,
+          4,
+          Math.max(4, (chartHeight || height) - height - 4),
+        );
         const fill = bullish ? "rgba(34,197,94,0.2)" : "rgba(248,113,113,0.22)";
         const gradient = bullish
           ? "linear-gradient(180deg, rgba(16,185,129,0.35) 0%, rgba(16,185,129,0.08) 95%)"
@@ -2192,6 +2212,41 @@ export function ChartPanel({
       setSignalBoxes((prev) => (areOverlayBoxesEqual(prev, boxes) ? prev : boxes));
     } else {
       setSignalBoxes((prev) => (prev.length ? [] : prev));
+    }
+
+    if (overlays.tradeMarkers && chartTrades.length && chartWidth > 0 && chartHeight > 0) {
+      const boxes: OverlayBox[] = [];
+      chartTrades.slice(-12).forEach((trade, idx) => {
+        const anchorTime = trade.openTime ?? trade.exitTime ?? candles.at(-1)?.t;
+        if (anchorTime == null) return;
+        const x = timeToX(anchorTime);
+        const y = priceToY(trade.entry);
+        if (x == null || y == null) return;
+        const width = 132;
+        const height = 22;
+        const left = clamp(x - width / 2, 4, Math.max(4, (chartWidth || width) - width - 4));
+        const top = clamp(
+          trade.direction === "buy" ? y + 28 : y - height - 28,
+          4,
+          Math.max(4, (chartHeight || height) - height - 4),
+        );
+        const { fill, border, text } = styleForTradeOverlay(trade);
+        boxes.push({
+          id: `trade-box-${trade.id}-${idx}`,
+          left,
+          width,
+          top,
+          height,
+          color: fill,
+          borderColor: border,
+          gradient: fill,
+          textColor: text,
+          label: formatTradeOverlayLabel(trade),
+        });
+      });
+      setTradeBoxes((prev) => (areOverlayBoxesEqual(prev, boxes) ? prev : boxes));
+    } else {
+      setTradeBoxes((prev) => (prev.length ? [] : prev));
     }
 
     if (overlays.structureSegments && structureShifts && chartWidth > 0 && chartHeight > 0) {
@@ -2231,16 +2286,20 @@ export function ChartPanel({
     overlays.fvg,
     overlays.orderBlocks,
     overlays.breakers,
+    overlays.oteBands,
     premiumDiscount,
     model2022?.m15Signals,
     model2022?.obWithDisplacement,
     overlays.signals,
+    overlays.tradeMarkers,
     overlays.liquidity,
     overlays.sweeps,
     overlays.structureSegments,
     overlays.eqConnectors,
     overlays.pdZones,
-    signals,
+    overlays.inversionFvgSignals,
+    chartSignals,
+    chartTrades,
     selectedSetup,
     matchesSelectedSetup,
     chartWidth,
@@ -2572,7 +2631,7 @@ export function ChartPanel({
           onPointerCancel={handlePointerCancel}
         />
         {overlays.pdZones && premiumDiscount && pdZones.length > 0 && (
-          <div className="pointer-events-none absolute inset-0 z-5">
+          <div className="pointer-events-none absolute inset-0 z-[5]">
             {pdZones.map((zone) => (
               <div
                 key={zone.id}
@@ -2595,6 +2654,7 @@ export function ChartPanel({
             ))}
           </div>
         )}
+        {overlays.oteBands && oteBoxes.length > 0 && <FvgOverlayLayer boxes={oteBoxes} className="z-[6]" />}
         {overlays.sessions && sessionBands.length > 0 && (
           <div className="pointer-events-none absolute inset-0 z-10">
             {sessionBands.map((band) => (
@@ -2898,8 +2958,34 @@ export function ChartPanel({
             ))}
           </div>
         )}
+        {overlays.tradeMarkers && tradeBoxes.length > 0 && (
+          <div className="pointer-events-none absolute inset-0 z-[18]">
+            {tradeBoxes.map((box) => (
+              <div
+                key={box.id}
+                className="absolute rounded border shadow-sm shadow-black/35"
+                style={{
+                  left: `${box.left}px`,
+                  width: `${box.width}px`,
+                  top: `${box.top}px`,
+                  height: `${box.height}px`,
+                  background: box.gradient ?? box.color,
+                  borderColor: box.borderColor ?? box.color,
+                }}
+                title={box.label}
+              >
+                <div
+                  className="absolute left-1 top-1 rounded px-1 py-0.5 text-[10px] font-semibold"
+                  style={{ backgroundColor: "rgba(0,0,0,0.42)", color: box.textColor ?? "#f8fafc" }}
+                >
+                  {box.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {overlays.liquidity && structureSegments.length > 0 && (
-          <div className="pointer-events-none absolute inset-0 z-15">
+          <div className="pointer-events-none absolute inset-0 z-[15]">
             {structureSegments.map((seg) => (
               <div
                 key={seg.id}
@@ -2923,7 +3009,7 @@ export function ChartPanel({
           </div>
         )}
         {overlays.sweeps && eqSegments.length > 0 && (
-          <div className="pointer-events-none absolute inset-0 z-15">
+          <div className="pointer-events-none absolute inset-0 z-[15]">
             {eqSegments.map((seg) => (
               <div
                 key={seg.id}
@@ -2946,58 +3032,10 @@ export function ChartPanel({
             ))}
           </div>
         )}
-        {overlays.fvg && model2022Boxes.length > 0 && (
-          <div className="pointer-events-none absolute inset-0 z-20">
-            {model2022Boxes.map((box) => (
-              <div
-                key={box.id}
-                className="absolute rounded border"
-                style={{
-                  left: `${box.left}px`,
-                  width: `${box.width}px`,
-                  top: `${box.top}px`,
-                  height: `${box.height}px`,
-                  background: box.gradient ?? box.color,
-                  borderColor: box.borderColor ?? box.color,
-                }}
-                title={box.label}
-              >
-                <div
-                  className="absolute left-1 top-1 rounded px-1 py-0.5 text-[10px]"
-                  style={{ backgroundColor: "rgba(0,0,0,0.55)", color: box.textColor ?? "#f8fafc" }}
-                >
-                  {box.label}
-                </div>
-              </div>
-            ))}
-          </div>
+        {overlays.inversionFvgSignals && model2022Boxes.length > 0 && (
+          <FvgOverlayLayer boxes={model2022Boxes} className="z-20" />
         )}
-        {overlays.fvg && fvgBoxes.length > 0 && (
-          <div className="pointer-events-none absolute inset-0 z-10">
-            {fvgBoxes.map((box) => (
-              <div
-                key={box.id}
-                className="absolute rounded border"
-                style={{
-                  left: `${box.left}px`,
-                  width: `${box.width}px`,
-                  top: `${box.top}px`,
-                  height: `${box.height}px`,
-                  background: box.gradient ?? box.color,
-                  borderColor: box.borderColor ?? box.color,
-                }}
-                title={box.label}
-              >
-                <div
-                  className="absolute left-1 top-1 rounded px-1 py-0.5 text-[10px]"
-                  style={{ backgroundColor: "rgba(0,0,0,0.45)", color: box.textColor ?? "#e2e8f0" }}
-                >
-                  {box.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {overlays.fvg && fvgBoxes.length > 0 && <FvgOverlayLayer boxes={fvgBoxes} className="z-10" />}
         {overlays.orderBlocks && obBoxes.length > 0 && (
           <div className="pointer-events-none absolute inset-0 z-10">
             {obBoxes.map((box) => (
@@ -3230,6 +3268,47 @@ function formatTradeMarkerLabel(trade: BacktestTrade) {
   const base = trade.direction === "buy" ? "BUY" : "SELL";
   const code = getTradeStatusCode(trade);
   return code ? `${base}(${code})` : base;
+}
+
+function formatTradeOverlayLabel(trade: BacktestTrade) {
+  const tradeCode = formatTradeMarkerLabel(trade);
+  const setup = trade.setup ? formatSetupShort(trade.setup) : "TRADE";
+  return `${tradeCode} · ${setup}`;
+}
+
+function styleForTradeOverlay(trade: BacktestTrade) {
+  if (trade.result === "win") {
+    return {
+      fill: "linear-gradient(180deg, rgba(16,185,129,0.36) 0%, rgba(16,185,129,0.12) 100%)",
+      border: "rgba(45,212,191,0.88)",
+      text: "#d1fae5",
+    };
+  }
+  if (trade.result === "loss") {
+    return {
+      fill: "linear-gradient(180deg, rgba(248,113,113,0.36) 0%, rgba(248,113,113,0.12) 100%)",
+      border: "rgba(251,146,60,0.88)",
+      text: "#fee2e2",
+    };
+  }
+  if (trade.result === "breakeven") {
+    return {
+      fill: "linear-gradient(180deg, rgba(148,163,184,0.34) 0%, rgba(148,163,184,0.12) 100%)",
+      border: "rgba(191,219,254,0.88)",
+      text: "#e2e8f0",
+    };
+  }
+  return trade.direction === "buy"
+    ? {
+        fill: "linear-gradient(180deg, rgba(34,197,94,0.34) 0%, rgba(34,197,94,0.1) 100%)",
+        border: "rgba(74,222,128,0.88)",
+        text: "#dcfce7",
+      }
+    : {
+        fill: "linear-gradient(180deg, rgba(249,115,22,0.34) 0%, rgba(249,115,22,0.1) 100%)",
+        border: "rgba(251,146,60,0.88)",
+        text: "#ffedd5",
+      };
 }
 
 function getTradeStatusCode(trade: BacktestTrade) {
@@ -3480,6 +3559,9 @@ type OverlayBox = {
   gradient?: string;
   textColor?: string;
   label: string;
+  showLabel?: boolean;
+  guideColor?: string;
+  midlineColor?: string;
 };
 
 function areOverlayBoxesEqual(a: OverlayBox[], b: OverlayBox[]) {
@@ -3495,10 +3577,145 @@ function areOverlayBoxesEqual(a: OverlayBox[], b: OverlayBox[]) {
       boxA.top !== boxB.top ||
       boxA.height !== boxB.height ||
       boxA.color !== boxB.color ||
-      boxA.label !== boxB.label
+      boxA.borderColor !== boxB.borderColor ||
+      boxA.gradient !== boxB.gradient ||
+      boxA.textColor !== boxB.textColor ||
+      boxA.label !== boxB.label ||
+      boxA.showLabel !== boxB.showLabel ||
+      boxA.guideColor !== boxB.guideColor ||
+      boxA.midlineColor !== boxB.midlineColor
     ) {
       return false;
     }
   }
   return true;
+}
+
+function FvgOverlayLayer({ boxes, className }: { boxes: OverlayBox[]; className: string }) {
+  return (
+    <div className={clsx("pointer-events-none absolute inset-0", className)}>
+      {boxes.map((box) => (
+        <div
+          key={box.id}
+          className="absolute overflow-hidden rounded-md border"
+          style={{
+            left: `${box.left}px`,
+            width: `${box.width}px`,
+            top: `${box.top}px`,
+            height: `${box.height}px`,
+            background: box.gradient ?? box.color,
+            borderColor: box.borderColor ?? box.color,
+            boxShadow: `inset 0 0 0 1px ${box.borderColor ?? box.color}`,
+          }}
+          title={box.label}
+        >
+          <div
+            className="absolute inset-y-0 left-0 border-l border-dashed opacity-90"
+            style={{ borderColor: box.guideColor ?? box.borderColor ?? box.color }}
+          />
+          <div
+            className="absolute inset-y-0 right-0 border-r border-dashed opacity-90"
+            style={{ borderColor: box.guideColor ?? box.borderColor ?? box.color }}
+          />
+          <div
+            className="absolute left-0 right-0 top-1/2 border-t border-dashed opacity-60"
+            style={{ borderColor: box.midlineColor ?? box.borderColor ?? box.color }}
+          />
+          {box.showLabel !== false && (
+            <div
+              className="absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium"
+              style={{ backgroundColor: "rgba(2,6,23,0.62)", color: box.textColor ?? "#e2e8f0" }}
+            >
+              {box.label}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function buildGapOverlayBox({
+  id,
+  gap,
+  timeToX,
+  priceToY,
+  candleSlotWidth,
+  color,
+  gradient,
+  borderColor,
+  textColor,
+  label,
+}: {
+  id: string;
+  gap: Gap;
+  timeToX: (time: number) => number | null;
+  priceToY: (price: number) => number | null;
+  candleSlotWidth: number;
+  color: string;
+  gradient: string;
+  borderColor: string;
+  textColor: string;
+  label: string;
+}): OverlayBox | null {
+  const startX = timeToX(gap.startTime);
+  const endX = timeToX(gap.endTime);
+  const yTop = priceToY(Math.max(gap.top, gap.bottom));
+  const yBottom = priceToY(Math.min(gap.top, gap.bottom));
+  if (startX == null || endX == null || yTop == null || yBottom == null) {
+    return null;
+  }
+
+  const halfCandle = candleSlotWidth / 2;
+  const visualLeft = Math.min(startX, endX) + halfCandle;
+  const visualRight = Math.max(startX, endX) - halfCandle;
+  const zoneWidth = Math.max(candleSlotWidth * 0.9, visualRight - visualLeft);
+  const zoneHeight = Math.max(3, Math.abs(yTop - yBottom));
+
+  return {
+    id,
+    left: visualRight > visualLeft ? visualLeft : Math.min(startX, endX),
+    width: zoneWidth,
+    top: Math.min(yTop, yBottom),
+    height: zoneHeight,
+    color,
+    borderColor,
+    gradient,
+    textColor,
+    label,
+    showLabel: zoneWidth >= 72 && zoneHeight >= 16,
+    guideColor: borderColor,
+    midlineColor: borderColor,
+  };
+}
+
+function estimateCandleSlotWidth(
+  candles: Candle[],
+  timeToX: (time: number) => number | null,
+  chartWidth: number,
+) {
+  if (candles.length < 2) {
+    return clamp(chartWidth / 12, 8, 28);
+  }
+
+  const spacings: number[] = [];
+  const startIndex = Math.max(1, candles.length - 40);
+  for (let i = startIndex; i < candles.length; i++) {
+    const prevX = timeToX(candles[i - 1].t);
+    const currX = timeToX(candles[i].t);
+    if (prevX == null || currX == null) {
+      continue;
+    }
+    const spacing = Math.abs(currX - prevX);
+    if (spacing > 0) {
+      spacings.push(spacing);
+    }
+  }
+
+  const averageSpacing =
+    spacings.length > 0
+      ? spacings.reduce((sum, spacing) => sum + spacing, 0) / spacings.length
+      : chartWidth / Math.max(candles.length, 1);
+
+  return clamp(averageSpacing * 0.72, 6, 42);
 }

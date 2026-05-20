@@ -402,8 +402,8 @@ public class SignalAnalysisService {
       CandleBar a = candles.get(i - 1);
       CandleBar b = candles.get(i);
       CandleBar c = candles.get(i + 1);
-      boolean bullishGap = a.h < c.l && b.l > a.h && b.l > c.h;
-      boolean bearishGap = a.l > c.h && b.h < a.l && b.h < c.l;
+      boolean bullishGap = a.h < c.l && b.c > b.o;
+      boolean bearishGap = a.l > c.h && b.c < b.o;
       if (bullishGap) {
         gaps.add(new GapZone(a.t, c.t, a.h, c.l, "bullish"));
       }
@@ -477,7 +477,7 @@ public class SignalAnalysisService {
       boolean brokeLow = activeLow != null && lowSpacingOk && hasDisplacement(candle, activeLow.price, "down", displacementAtr, minBreakPct);
 
       if (brokeHigh && !"bullish".equals(state) && activeHigh != null) {
-        if (bar - lastShiftBar < minSpacingBars) {
+        if (isWithinBarSpacing(bar, lastShiftBar, minSpacingBars)) {
           continue;
         }
         shifts.add(new StructureShiftPoint(
@@ -489,7 +489,7 @@ public class SignalAnalysisService {
         state = "bullish";
         lastShiftBar = bar;
       } else if (brokeLow && !"bearish".equals(state) && activeLow != null) {
-        if (bar - lastShiftBar < minSpacingBars) {
+        if (isWithinBarSpacing(bar, lastShiftBar, minSpacingBars)) {
           continue;
         }
         shifts.add(new StructureShiftPoint(
@@ -564,7 +564,7 @@ public class SignalAnalysisService {
       LevelPoint sweptHigh = highLevels.stream().filter(l -> candle.h > l.price && candle.t > l.time).findFirst().orElse(null);
       if (
         sweptHigh != null &&
-        i - lastHighSweepIndex >= minSpacingBars &&
+        hasRequiredBarSpacing(i, lastHighSweepIndex, minSpacingBars) &&
         (Double.isNaN(lastHighSweepPrice) || Math.abs(sweptHigh.price - lastHighSweepPrice) > sweptHigh.price * tolerancePct)
       ) {
         sweeps.add(new LiquiditySweepPoint(candle.t, sweptHigh.price, "eqh", "up"));
@@ -574,7 +574,7 @@ public class SignalAnalysisService {
       LevelPoint sweptLow = lowLevels.stream().filter(l -> candle.l < l.price && candle.t > l.time).findFirst().orElse(null);
       if (
         sweptLow != null &&
-        i - lastLowSweepIndex >= minSpacingBars &&
+        hasRequiredBarSpacing(i, lastLowSweepIndex, minSpacingBars) &&
         (Double.isNaN(lastLowSweepPrice) || Math.abs(sweptLow.price - lastLowSweepPrice) > sweptLow.price * tolerancePct)
       ) {
         sweeps.add(new LiquiditySweepPoint(candle.t, sweptLow.price, "eql", "down"));
@@ -926,6 +926,13 @@ public class SignalAnalysisService {
     }
   }
 
+  private boolean isWithinNewYorkSilverBulletWindow(long epochMs, SessionZone session) {
+    if (session == null || !session.label.contains("New York")) {
+      return false;
+    }
+    return SignalSetupRules.isWithinNewYorkSilverBulletWindow(getHourInTz(epochMs, "America/New_York"));
+  }
+
   private List<GeneratedSignal> detectSignals(
     List<CandleBar> candles,
     BiasState baseBias,
@@ -1060,149 +1067,89 @@ public class SignalAnalysisService {
       GapZone tappedBullGap = findTappedGap(gaps, candle, "bullish");
       GapZone tappedBearGap = findTappedGap(gaps, candle, "bearish");
 
-      if (
-        sessionAllowed &&
-        "Bullish".equals(biasLabel) &&
-        bullishConfirm &&
-        htfBuyZone &&
-        shiftNow != null &&
-        "bullish".equals(shiftNow.direction) &&
-        hasClearPath(candle.c, candle.c + proximity * 3, "buy", gaps) &&
-        (tappedBullBlock != null || tappedBullGap != null) &&
-        prev.c >= prev.o
-      ) {
-        double stop = Optional.ofNullable(findRecentSwing(swings, "low", candle.t)).orElse(prev.l);
-        double risk = candle.c - stop;
-        if (risk > 0) {
-          pushSignal(
-            signals,
-            new GeneratedSignal(candle.t, candle.c, "buy", "Bias + OB/FVG + Session",
-              String.join(" • ",
-                "Bias bullish",
-                tappedBullBlock != null ? "Tapped Bullish OB" : "Tapped Bullish FVG",
-                "Session " + session.label
-              )
-            ).withStop(stop).withTargets(candle.c + risk, candle.c + risk * 2).withContext(session.label, biasLabel),
-            i,
-            currentAtr,
-            optimizationWeights,
-            lastSignalIndex,
-            signalsPerBar,
-            signalsPerDay,
-            dayKey,
-            lastSignalBar,
-            setupCooldown,
-            globalCooldown,
-            maxSignalsPerBar,
-            maxTradesPerDay,
-            minRMultiple
-          );
-          lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
-        }
+      GeneratedSignal biasOrderBlockSignal = buildBiasOrderBlockSessionSignal(
+        candle,
+        prev,
+        swings,
+        gaps,
+        sessionAllowed,
+        biasLabel,
+        bullishConfirm,
+        bearishConfirm,
+        htfBuyZone,
+        htfSellZone,
+        session,
+        shiftNow,
+        tappedBullBlock,
+        tappedBearBlock,
+        tappedBullGap,
+        tappedBearGap,
+        proximity
+      );
+      if (biasOrderBlockSignal != null) {
+        pushSignal(
+          signals,
+          biasOrderBlockSignal,
+          i,
+          currentAtr,
+          optimizationWeights,
+          lastSignalIndex,
+          signalsPerBar,
+          signalsPerDay,
+          dayKey,
+          lastSignalBar,
+          setupCooldown,
+          globalCooldown,
+          maxSignalsPerBar,
+          maxTradesPerDay,
+          minRMultiple
+        );
+        lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
       }
 
-      if (
-        sessionAllowed &&
-        "Bearish".equals(biasLabel) &&
-        bearishConfirm &&
-        htfSellZone &&
-        shiftNow != null &&
-        "bearish".equals(shiftNow.direction) &&
-        hasClearPath(candle.c, candle.c - proximity * 3, "sell", gaps) &&
-        (tappedBearBlock != null || tappedBearGap != null) &&
-        prev.c <= prev.o
-      ) {
-        double stop = Optional.ofNullable(findRecentSwing(swings, "high", candle.t)).orElse(prev.h);
-        double risk = stop - candle.c;
-        if (risk > 0) {
-          pushSignal(
-            signals,
-            new GeneratedSignal(candle.t, candle.c, "sell", "Bias + OB/FVG + Session",
-              String.join(" • ",
-                "Bias bearish",
-                tappedBearBlock != null ? "Tapped Bearish OB" : "Tapped Bearish FVG",
-                "Session " + session.label
-              )
-            ).withStop(stop).withTargets(candle.c - risk, candle.c - risk * 2).withContext(session.label, biasLabel),
-            i,
-            currentAtr,
-            optimizationWeights,
-            lastSignalIndex,
-            signalsPerBar,
-            signalsPerDay,
-            dayKey,
-            lastSignalBar,
-            setupCooldown,
-            globalCooldown,
-            maxSignalsPerBar,
-            maxTradesPerDay,
-            minRMultiple
-          );
-          lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
-        }
-      }
-
-      GapZone recentGap = findLastGap(gaps, candle.t);
-      if (sessionAllowed && recentGap != null && shiftNow != null) {
+      if (sessionAllowed && shiftNow != null) {
         PremiumDiscountRangeData oteRange = computePremiumDiscountRange(candles.subList(Math.max(0, i - 50), i + 1));
         if (oteRange != null) {
           double oteHigh = oteRange.high - (oteRange.high - oteRange.low) * 0.62;
           double oteLow = oteRange.high - (oteRange.high - oteRange.low) * 0.705;
           boolean inOte = betweenInclusive(candle.c, oteHigh, oteLow);
-          double gapTop = Math.max(recentGap.top, recentGap.bottom);
-          double gapBottom = Math.min(recentGap.top, recentGap.bottom);
-          boolean inFvg = candle.l <= gapTop && candle.h >= gapBottom;
-          if ("bullish".equals(shiftNow.direction) && inFvg && inOte && bullishConfirm && htfBuyZone) {
-            double stop = Optional.ofNullable(findRecentSwing(swings, "low", candle.t)).orElse(prev.l);
-            double risk = candle.c - stop;
-            if (risk > 0) {
-              pushSignal(
-                signals,
-                new GeneratedSignal(candle.t, candle.c, "buy", "CHoCH + FVG + OTE",
-                  "CHoCH up • FVG tap • Within OTE zone"
-                ).withStop(stop).withTargets(candle.c + risk, candle.c + risk * 2).withContext(session.label, biasLabel),
-                i,
-                currentAtr,
-                optimizationWeights,
-                lastSignalIndex,
-                signalsPerBar,
-                signalsPerDay,
-                dayKey,
-                lastSignalBar,
-                setupCooldown,
-                globalCooldown,
-                maxSignalsPerBar,
-                maxTradesPerDay,
-                minRMultiple
-              );
-              lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
-            }
-          }
-          if ("bearish".equals(shiftNow.direction) && inFvg && inOte && bearishConfirm && htfSellZone) {
-            double stop = Optional.ofNullable(findRecentSwing(swings, "high", candle.t)).orElse(prev.h);
-            double risk = stop - candle.c;
-            if (risk > 0) {
-              pushSignal(
-                signals,
-                new GeneratedSignal(candle.t, candle.c, "sell", "CHoCH + FVG + OTE",
-                  "CHoCH down • FVG tap • Within OTE zone"
-                ).withStop(stop).withTargets(candle.c - risk, candle.c - risk * 2).withContext(session.label, biasLabel),
-                i,
-                currentAtr,
-                optimizationWeights,
-                lastSignalIndex,
-                signalsPerBar,
-                signalsPerDay,
-                dayKey,
-                lastSignalBar,
-                setupCooldown,
-                globalCooldown,
-                maxSignalsPerBar,
-                maxTradesPerDay,
-                minRMultiple
-              );
-              lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
-            }
+          SignalSetupRules.SignalSpec chochFvgOteSignal = SignalSetupRules.buildChochFvgOteSignal(
+            new SignalSetupRules.ChochFvgOteInput(
+              toCandleSnapshot(candle),
+              sessionAllowed,
+              biasLabel,
+              bullishConfirm,
+              bearishConfirm,
+              htfBuyZone,
+              htfSellZone,
+              session.label,
+              toShiftSnapshot(shiftNow),
+              toGapSnapshot(tappedBullGap),
+              toGapSnapshot(tappedBearGap),
+              inOte,
+              Optional.ofNullable(findRecentSwing(swings, "low", candle.t)).orElse(prev.l),
+              Optional.ofNullable(findRecentSwing(swings, "high", candle.t)).orElse(prev.h)
+            )
+          );
+          if (chochFvgOteSignal != null) {
+            pushSignal(
+              signals,
+              toGeneratedSignal(chochFvgOteSignal),
+              i,
+              currentAtr,
+              optimizationWeights,
+              lastSignalIndex,
+              signalsPerBar,
+              signalsPerDay,
+              dayKey,
+              lastSignalBar,
+              setupCooldown,
+              globalCooldown,
+              maxSignalsPerBar,
+              maxTradesPerDay,
+              minRMultiple
+            );
+            lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
           }
         }
       }
@@ -1279,33 +1226,29 @@ public class SignalAnalysisService {
       }
 
       if (sessionAllowed && lastSweep != null && killZoneContext) {
-        if ("up".equals(lastSweep.direction) && bearishConfirm && "Bearish".equals(biasLabel) && htfSellZone) {
-          double stop = lastSweep.price * 1.0002;
-          double risk = stop - candle.c;
-          if (risk > 0) {
-            pushSignal(
-              signals,
-              new GeneratedSignal(candle.t, candle.c, "sell", "Sweep + Shift", "EQH sweep • Looking for shift lower")
-                .withStop(stop).withTargets(candle.c - risk, candle.c - risk * 2).withContext(session.label, biasLabel),
-              i, currentAtr, optimizationWeights, lastSignalIndex, signalsPerBar, signalsPerDay, dayKey,
-              lastSignalBar, setupCooldown, globalCooldown, maxSignalsPerBar, maxTradesPerDay, minRMultiple
-            );
-            lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
-          }
-        }
-        if ("down".equals(lastSweep.direction) && bullishConfirm && "Bullish".equals(biasLabel) && htfBuyZone) {
-          double stop = lastSweep.price * 0.9998;
-          double risk = candle.c - stop;
-          if (risk > 0) {
-            pushSignal(
-              signals,
-              new GeneratedSignal(candle.t, candle.c, "buy", "Sweep + Shift", "EQL sweep • Looking for shift higher")
-                .withStop(stop).withTargets(candle.c + risk, candle.c + risk * 2).withContext(session.label, biasLabel),
-              i, currentAtr, optimizationWeights, lastSignalIndex, signalsPerBar, signalsPerDay, dayKey,
-              lastSignalBar, setupCooldown, globalCooldown, maxSignalsPerBar, maxTradesPerDay, minRMultiple
-            );
-            lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
-          }
+        SignalSetupRules.SignalSpec sweepShiftSignal = SignalSetupRules.buildSweepShiftSignal(
+          new SignalSetupRules.SweepShiftInput(
+            toCandleSnapshot(candle),
+            sessionAllowed,
+            killZoneContext,
+            biasLabel,
+            bullishConfirm,
+            bearishConfirm,
+            htfBuyZone,
+            htfSellZone,
+            session.label,
+            toShiftSnapshot(shiftNow),
+            toSweepSnapshot(lastSweep)
+          )
+        );
+        if (sweepShiftSignal != null) {
+          pushSignal(
+            signals,
+            toGeneratedSignal(sweepShiftSignal),
+            i, currentAtr, optimizationWeights, lastSignalIndex, signalsPerBar, signalsPerDay, dayKey,
+            lastSignalBar, setupCooldown, globalCooldown, maxSignalsPerBar, maxTradesPerDay, minRMultiple
+          );
+          lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
         }
       }
 
@@ -1456,41 +1399,31 @@ public class SignalAnalysisService {
         }
       }
 
-      int hour = candleTime.getHour();
-      boolean silverBulletWindow = session.label.contains("New York") && hour >= 17 && hour <= 20;
-      if (silverBulletWindow && lastSweep != null && recentGap != null) {
-        double gapTop = Math.max(recentGap.top, recentGap.bottom);
-        double gapBottom = Math.min(recentGap.top, recentGap.bottom);
-        boolean inGap = candle.l <= gapTop && candle.h >= gapBottom;
-        if ("down".equals(lastSweep.direction) && "bullish".equals(recentGap.type) && inGap && bullishConfirm && htfBuyZone) {
-          double stop = Math.min(lastSweep.price, candle.l);
-          double risk = candle.c - stop;
-          if (risk > 0) {
-            pushSignal(
-              signals,
-              new GeneratedSignal(candle.t, candle.c, "buy", "Silver Bullet",
-                "NY silver window • Sweep of lows • FVG return"
-              ).withStop(stop).withTargets(candle.c + risk, candle.c + risk * 2).withContext(session.label, biasLabel),
-              i, currentAtr, optimizationWeights, lastSignalIndex, signalsPerBar, signalsPerDay, dayKey,
-              lastSignalBar, setupCooldown, globalCooldown, maxSignalsPerBar, maxTradesPerDay, minRMultiple
-            );
-            lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
-          }
-        }
-        if ("up".equals(lastSweep.direction) && "bearish".equals(recentGap.type) && inGap && bearishConfirm && htfSellZone) {
-          double stop = Math.max(lastSweep.price, candle.h);
-          double risk = stop - candle.c;
-          if (risk > 0) {
-            pushSignal(
-              signals,
-              new GeneratedSignal(candle.t, candle.c, "sell", "Silver Bullet",
-                "NY silver window • Sweep of highs • FVG return"
-              ).withStop(stop).withTargets(candle.c - risk, candle.c - risk * 2).withContext(session.label, biasLabel),
-              i, currentAtr, optimizationWeights, lastSignalIndex, signalsPerBar, signalsPerDay, dayKey,
-              lastSignalBar, setupCooldown, globalCooldown, maxSignalsPerBar, maxTradesPerDay, minRMultiple
-            );
-            lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
-          }
+      GapZone recentGap = findLastGap(gaps, candle.t);
+      boolean silverBulletWindow = isWithinNewYorkSilverBulletWindow(candle.t, session);
+      if (silverBulletWindow) {
+        SignalSetupRules.SignalSpec silverBulletSignal = SignalSetupRules.buildSilverBulletSignal(
+          new SignalSetupRules.SilverBulletInput(
+            toCandleSnapshot(candle),
+            sessionAllowed,
+            session.label,
+            biasLabel,
+            bullishConfirm,
+            bearishConfirm,
+            htfBuyZone,
+            htfSellZone,
+            toSweepSnapshot(lastSweep),
+            toGapSnapshot(recentGap)
+          )
+        );
+        if (silverBulletSignal != null) {
+          pushSignal(
+            signals,
+            toGeneratedSignal(silverBulletSignal),
+            i, currentAtr, optimizationWeights, lastSignalIndex, signalsPerBar, signalsPerDay, dayKey,
+            lastSignalBar, setupCooldown, globalCooldown, maxSignalsPerBar, maxTradesPerDay, minRMultiple
+          );
+          lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
         }
       }
 
@@ -1510,41 +1443,32 @@ public class SignalAnalysisService {
       }
       if (sessionAllowed && turtleHigh != null && turtleLow != null) {
         double avgAtr = average(Arrays.copyOfRange(atrValues, Math.max(0, i - 120), i));
-        double turtleRange = turtleHigh - turtleLow;
         boolean strongTrend = emaFast[i] != null && emaSlow[i] != null && Math.abs(emaFast[i] - emaSlow[i]) > Math.abs(emaSlow[i]) * 0.0025;
-        if (avgAtr > 0 && turtleRange <= avgAtr * 8 && !strongTrend) {
-          if (candle.h > turtleHigh && candle.c < turtleHigh && "bearish".equals(candleDirection)) {
-            double stop = Math.max(candle.h, turtleHigh);
-            double entry = Math.min(candle.c, turtleHigh);
-            double risk = stop - entry;
-            if (risk > 0) {
-              pushSignal(
-                signals,
-                new GeneratedSignal(candle.t, entry, "sell", "Turtle Soup",
-                  "20-day high sweep • Close back below range"
-                ).withStop(stop).withTargets(entry - risk, entry - risk * 2).withContext(session.label, biasLabel),
-                i, currentAtr, optimizationWeights, lastSignalIndex, signalsPerBar, signalsPerDay, dayKey,
-                lastSignalBar, setupCooldown, globalCooldown, maxSignalsPerBar, maxTradesPerDay, minRMultiple
-              );
-              lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
-            }
-          }
-          if (candle.l < turtleLow && candle.c > turtleLow && "bullish".equals(candleDirection)) {
-            double stop = Math.min(candle.l, turtleLow);
-            double entry = Math.max(candle.c, turtleLow);
-            double risk = entry - stop;
-            if (risk > 0) {
-              pushSignal(
-                signals,
-                new GeneratedSignal(candle.t, entry, "buy", "Turtle Soup",
-                  "20-day low sweep • Close back above range"
-                ).withStop(stop).withTargets(entry + risk, entry + risk * 2).withContext(session.label, biasLabel),
-                i, currentAtr, optimizationWeights, lastSignalIndex, signalsPerBar, signalsPerDay, dayKey,
-                lastSignalBar, setupCooldown, globalCooldown, maxSignalsPerBar, maxTradesPerDay, minRMultiple
-              );
-              lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
-            }
-          }
+        SignalSetupRules.SignalSpec turtleSoupSignal = SignalSetupRules.buildTurtleSoupSignal(
+          new SignalSetupRules.TurtleSoupInput(
+            toCandleSnapshot(candle),
+            sessionAllowed,
+            killZoneContext,
+            session.label,
+            biasLabel,
+            bullishConfirm,
+            bearishConfirm,
+            htfBuyZone,
+            htfSellZone,
+            turtleHigh,
+            turtleLow,
+            avgAtr,
+            strongTrend
+          )
+        );
+        if (turtleSoupSignal != null) {
+          pushSignal(
+            signals,
+            toGeneratedSignal(turtleSoupSignal),
+            i, currentAtr, optimizationWeights, lastSignalIndex, signalsPerBar, signalsPerDay, dayKey,
+            lastSignalBar, setupCooldown, globalCooldown, maxSignalsPerBar, maxTradesPerDay, minRMultiple
+          );
+          lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
         }
       }
 
@@ -1591,37 +1515,34 @@ public class SignalAnalysisService {
         }
       }
 
-      if (sessionAllowed) {
-        if ("Bullish".equals(biasLabel) && candle.l <= prev.l && bullishConfirm) {
-          double stop = Math.min(candle.l, prev.l);
-          double risk = candle.c - stop;
-          if (risk > 0) {
-            pushSignal(
-              signals,
-              new GeneratedSignal(candle.t, candle.c, "buy", "Pullback Reentry",
-                "Bias bullish • Pullback rejection"
-              ).withStop(stop).withTargets(candle.c + risk, candle.c + risk * 2).withContext(session.label, biasLabel),
-              i, currentAtr, optimizationWeights, lastSignalIndex, signalsPerBar, signalsPerDay, dayKey,
-              lastSignalBar, setupCooldown, globalCooldown, maxSignalsPerBar, maxTradesPerDay, minRMultiple
-            );
-            lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
-          }
-        }
-        if ("Bearish".equals(biasLabel) && candle.h >= prev.h && bearishConfirm) {
-          double stop = Math.max(candle.h, prev.h);
-          double risk = stop - candle.c;
-          if (risk > 0) {
-            pushSignal(
-              signals,
-              new GeneratedSignal(candle.t, candle.c, "sell", "Pullback Reentry",
-                "Bias bearish • Pullback rejection"
-              ).withStop(stop).withTargets(candle.c - risk, candle.c - risk * 2).withContext(session.label, biasLabel),
-              i, currentAtr, optimizationWeights, lastSignalIndex, signalsPerBar, signalsPerDay, dayKey,
-              lastSignalBar, setupCooldown, globalCooldown, maxSignalsPerBar, maxTradesPerDay, minRMultiple
-            );
-            lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
-          }
-        }
+      GeneratedSignal pullbackReentrySignal = buildPullbackReentrySignal(
+        candle,
+        prev,
+        sessionAllowed,
+        biasLabel,
+        bullishConfirm,
+        bearishConfirm,
+        session
+      );
+      if (pullbackReentrySignal != null) {
+        pushSignal(
+          signals,
+          pullbackReentrySignal,
+          i,
+          currentAtr,
+          optimizationWeights,
+          lastSignalIndex,
+          signalsPerBar,
+          signalsPerDay,
+          dayKey,
+          lastSignalBar,
+          setupCooldown,
+          globalCooldown,
+          maxSignalsPerBar,
+          maxTradesPerDay,
+          minRMultiple
+        );
+        lastSignalBar = updatedLastSignalBar(lastSignalBar, signals, i);
       }
     }
 
@@ -1629,6 +1550,146 @@ public class SignalAnalysisService {
       return signals.subList(signals.size() - signalLimit, signals.size());
     }
     return signals;
+  }
+
+  private GeneratedSignal buildBiasOrderBlockSessionSignal(
+    CandleBar candle,
+    CandleBar prev,
+    List<SwingPoint> swings,
+    List<GapZone> gaps,
+    boolean sessionAllowed,
+    String biasLabel,
+    boolean bullishConfirm,
+    boolean bearishConfirm,
+    boolean htfBuyZone,
+    boolean htfSellZone,
+    SessionZone session,
+    StructureShiftPoint shiftNow,
+    OrderBlockZone tappedBullBlock,
+    OrderBlockZone tappedBearBlock,
+    GapZone tappedBullGap,
+    GapZone tappedBearGap,
+    double proximity
+  ) {
+    if (shiftNow == null || !sessionAllowed) {
+      return null;
+    }
+
+    if (
+      "Bullish".equals(biasLabel) &&
+      bullishConfirm &&
+      htfBuyZone &&
+      "bullish".equals(shiftNow.direction) &&
+      hasClearPath(candle.c, candle.c + proximity * 3, "buy", gaps) &&
+      (tappedBullBlock != null || tappedBullGap != null) &&
+      prev.c >= prev.o
+    ) {
+      double stop = Optional.ofNullable(findRecentSwing(swings, "low", candle.t)).orElse(prev.l);
+      double risk = candle.c - stop;
+      if (risk > 0) {
+        return new GeneratedSignal(candle.t, candle.c, "buy", "Bias + OB/FVG + Session",
+          String.join(
+            " • ",
+            "Bias bullish",
+            tappedBullBlock != null ? "Tapped Bullish OB" : "Tapped Bullish FVG",
+            "Session " + session.label
+          )
+        ).withStop(stop).withTargets(candle.c + risk, candle.c + risk * 2).withContext(session.label, biasLabel);
+      }
+    }
+
+    if (
+      "Bearish".equals(biasLabel) &&
+      bearishConfirm &&
+      htfSellZone &&
+      "bearish".equals(shiftNow.direction) &&
+      hasClearPath(candle.c, candle.c - proximity * 3, "sell", gaps) &&
+      (tappedBearBlock != null || tappedBearGap != null) &&
+      prev.c <= prev.o
+    ) {
+      double stop = Optional.ofNullable(findRecentSwing(swings, "high", candle.t)).orElse(prev.h);
+      double risk = stop - candle.c;
+      if (risk > 0) {
+        return new GeneratedSignal(candle.t, candle.c, "sell", "Bias + OB/FVG + Session",
+          String.join(
+            " • ",
+            "Bias bearish",
+            tappedBearBlock != null ? "Tapped Bearish OB" : "Tapped Bearish FVG",
+            "Session " + session.label
+          )
+        ).withStop(stop).withTargets(candle.c - risk, candle.c - risk * 2).withContext(session.label, biasLabel);
+      }
+    }
+
+    return null;
+  }
+
+  private GeneratedSignal buildPullbackReentrySignal(
+    CandleBar candle,
+    CandleBar prev,
+    boolean sessionAllowed,
+    String biasLabel,
+    boolean bullishConfirm,
+    boolean bearishConfirm,
+    SessionZone session
+  ) {
+    if (!sessionAllowed) {
+      return null;
+    }
+
+    if ("Bullish".equals(biasLabel) && candle.l <= prev.l && bullishConfirm) {
+      double stop = Math.min(candle.l, prev.l);
+      double risk = candle.c - stop;
+      if (risk > 0) {
+        return new GeneratedSignal(candle.t, candle.c, "buy", "Pullback Reentry",
+          "Bias bullish • Pullback rejection"
+        ).withStop(stop).withTargets(candle.c + risk, candle.c + risk * 2).withContext(session.label, biasLabel);
+      }
+    }
+
+    if ("Bearish".equals(biasLabel) && candle.h >= prev.h && bearishConfirm) {
+      double stop = Math.max(candle.h, prev.h);
+      double risk = stop - candle.c;
+      if (risk > 0) {
+        return new GeneratedSignal(candle.t, candle.c, "sell", "Pullback Reentry",
+          "Bias bearish • Pullback rejection"
+        ).withStop(stop).withTargets(candle.c - risk, candle.c - risk * 2).withContext(session.label, biasLabel);
+      }
+    }
+
+    return null;
+  }
+
+  private SignalSetupRules.CandleSnapshot toCandleSnapshot(CandleBar candle) {
+    return new SignalSetupRules.CandleSnapshot(candle.t, candle.o, candle.h, candle.l, candle.c);
+  }
+
+  private SignalSetupRules.GapSnapshot toGapSnapshot(GapZone gap) {
+    if (gap == null) {
+      return null;
+    }
+    return new SignalSetupRules.GapSnapshot(gap.type, gap.top, gap.bottom);
+  }
+
+  private SignalSetupRules.ShiftSnapshot toShiftSnapshot(StructureShiftPoint shift) {
+    if (shift == null) {
+      return null;
+    }
+    return new SignalSetupRules.ShiftSnapshot(shift.direction, shift.label);
+  }
+
+  private SignalSetupRules.SweepSnapshot toSweepSnapshot(LiquiditySweepPoint sweep) {
+    if (sweep == null) {
+      return null;
+    }
+    return new SignalSetupRules.SweepSnapshot(sweep.direction, sweep.price);
+  }
+
+  private GeneratedSignal toGeneratedSignal(SignalSetupRules.SignalSpec signal) {
+    return new GeneratedSignal(signal.time(), signal.price(), signal.direction(), signal.setup(), signal.basis())
+      .withStop(signal.stop())
+      .withTargets(signal.tp1(), signal.tp2())
+      .withContext(signal.session(), signal.bias());
   }
 
   private int updatedLastSignalBar(int lastSignalBar, List<GeneratedSignal> signals, int currentBar) {
@@ -1656,7 +1717,7 @@ public class SignalAnalysisService {
     if (stats != null && !stats.allowed()) {
       return;
     }
-    if (barIndex - lastSignalBar < globalCooldown) {
+    if (isWithinBarSpacing(barIndex, lastSignalBar, globalCooldown)) {
       return;
     }
     if (signalsPerBar.getOrDefault(barIndex, 0) >= maxSignalsPerBar) {
@@ -1664,7 +1725,7 @@ public class SignalAnalysisService {
     }
     if (signal.setup != null) {
       int lastSetupBar = lastSignalIndex.getOrDefault(signal.setup, Integer.MIN_VALUE);
-      if (barIndex - lastSetupBar < setupCooldown) {
+      if (isWithinBarSpacing(barIndex, lastSetupBar, setupCooldown)) {
         return;
       }
     }
@@ -1710,6 +1771,14 @@ public class SignalAnalysisService {
     lastSignalIndex.put(signal.setup, barIndex);
     signalsPerBar.put(barIndex, signalsPerBar.getOrDefault(barIndex, 0) + 1);
     signalsPerDay.put(dayKey, signalsPerDay.getOrDefault(dayKey, 0) + 1);
+  }
+
+  private boolean isWithinBarSpacing(int currentBar, int previousBar, int spacingBars) {
+    return previousBar != Integer.MIN_VALUE && currentBar - previousBar < spacingBars;
+  }
+
+  private boolean hasRequiredBarSpacing(int currentBar, int previousBar, int spacingBars) {
+    return previousBar == Integer.MIN_VALUE || currentBar - previousBar >= spacingBars;
   }
 
   private boolean isTierOne(String setup) {
