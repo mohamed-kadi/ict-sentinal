@@ -113,6 +113,11 @@ Create `web/.env.local` when you need backend integration or market-data keys:
 NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8080
 TWELVE_DATA_KEY=your_key
 ALPHA_VANTAGE_KEY=your_key
+ALERT_WEBHOOK_URL=https://your-endpoint.example/webhook
+ALERT_WEBHOOK_TOKEN=optional_secret
+ALERT_EXECUTION_URL=https://your-execution.example/alerts
+ALERT_EXECUTION_TOKEN=optional_secret
+NEXT_PUBLIC_ALERT_RELAY_MODE=webhook
 NEXT_PUBLIC_ALERT_WEBHOOK=https://your-endpoint.example/webhook
 NEXT_PUBLIC_DEBUG_SIGNALS=false
 ```
@@ -121,6 +126,8 @@ Notes:
 - `NEXT_PUBLIC_BACKEND_BASE_URL` is required for server-side signal analysis and trade journaling from the UI.
 - Without the backend URL, the chart can still load candle data, but backend-derived analysis will not run.
 - Forex and gold can still work without API keys because the route falls back to Yahoo or mock candles.
+- Prefer `ALERT_WEBHOOK_URL` or `ALERT_EXECUTION_URL` so the browser talks to the local relay adapter instead of posting directly to third-party services.
+- `NEXT_PUBLIC_ALERT_RELAY_MODE` controls the UI badge when the actual relay target is configured through server-only env vars.
 
 ## Main backend endpoints
 - `POST /api/v1/analysis/signals`
