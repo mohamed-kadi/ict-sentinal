@@ -5,36 +5,13 @@ import { Bias, Timeframe, AssetClass } from '@/lib/types';
 import { CRYPTO_SYMBOLS, FOREX_SYMBOLS, STOCK_SYMBOLS } from '@/lib/config';
 import clsx from 'clsx';
 import { useAppStore } from '@/state/useAppStore';
+import { SymbolLogo } from './SymbolLogo';
 
 const MARKET_OPTIONS: { id: AssetClass; label: string }[] = [
   { id: 'crypto', label: 'Crypto' },
   { id: 'forex', label: 'Forex/Gold' },
   { id: 'stocks', label: 'Stocks' },
 ];
-
-// Lightweight logo mapping (Clearbit). Falls back to dot if missing.
-export const SYMBOL_LOGOS: Record<string, string> = {
-  BTCUSDT: 'https://logo.clearbit.com/binance.com',
-  ETHUSDT: 'https://logo.clearbit.com/ethereum.org',
-  SOLUSDT: 'https://logo.clearbit.com/solana.com',
-  XRPUSDT: 'https://logo.clearbit.com/ripple.com',
-  EURUSD: 'https://logo.clearbit.com/ecb.europa.eu',
-  GBPUSD: 'https://logo.clearbit.com/bankofengland.co.uk',
-  USDJPY: 'https://logo.clearbit.com/boj.or.jp',
-  XAUUSD: 'https://logo.clearbit.com/lbma.org.uk',
-  AAPL: 'https://logo.clearbit.com/apple.com',
-  MSFT: 'https://logo.clearbit.com/microsoft.com',
-  NVDA: 'https://logo.clearbit.com/nvidia.com',
-  AMZN: 'https://logo.clearbit.com/amazon.com',
-  GOOGL: 'https://logo.clearbit.com/abc.xyz',
-  META: 'https://logo.clearbit.com/meta.com',
-  TSLA: 'https://logo.clearbit.com/tesla.com',
-  SPY: 'https://logo.clearbit.com/spglobal.com',
-  QQQ: 'https://logo.clearbit.com/nasdaq.com',
-  DIA: 'https://logo.clearbit.com/spglobal.com',
-  US100: 'https://logo.clearbit.com/nasdaq.com',
-  default: 'https://logo.clearbit.com/tradingview.com',
-};
 
 type Props = {
   symbol: string;
@@ -143,19 +120,7 @@ export function TopBar({ symbol, timeframe, bias, latestOhlc }: Props) {
             )}
             onClick={() => setSymbol(s)}
           >
-            {SYMBOL_LOGOS[s] ? (
-              <Image
-                src={SYMBOL_LOGOS[s]!}
-                alt={s}
-                width={14}
-                height={14}
-                className="h-[14px] w-[14px] rounded-full bg-white/10 object-contain"
-                loading="lazy"
-                sizes="14px"
-              />
-            ) : (
-              <span>•</span>
-            )}
+            <SymbolLogo symbol={s} size={14} className="h-[14px] w-[14px]" />
             <span>{s}</span>
           </button>
         ))}
