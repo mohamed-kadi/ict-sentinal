@@ -5,13 +5,34 @@
 <h1 align="center">ICT Trading Desk</h1>
 
 <p align="center">
-  <strong>Full-stack ICT market-analysis workstation for chart replay, structure detection, and trade journaling.</strong>
+  <strong>ICT trading workflow studio for chart replay, structure detection, and trade journaling.</strong>
 </p>
 
 <p align="center">
-  <strong>Stack:</strong> Next.js 16, React 18, TypeScript, Spring Boot 3.3, Java 17, H2/PostgreSQL
-  <br />
-  <strong>Demo:</strong> Local frontend at <code>http://localhost:3000</code> with backend API at <code>http://localhost:8080</code>
+  ICT Trading Desk helps traders inspect liquidity, fair value gaps, order blocks, structure shifts, and replay-driven setups
+  across crypto, forex, metals, and stocks with a Next.js workstation backed by a Spring Boot analysis API.
+</p>
+
+<p align="center">
+  <a href="#how-to-run-the-project">
+    <img alt="Demo Localhost 3000" src="https://img.shields.io/badge/demo-localhost%3A3000-2563eb?style=for-the-badge&labelColor=4b5563" />
+  </a>
+  <img alt="Backend Spring Boot 3.3" src="https://img.shields.io/badge/backend-Spring_Boot_3.3-0f766e?style=for-the-badge&labelColor=4b5563&logo=springboot&logoColor=white" />
+  <img alt="Frontend Next.js 16 and React 18" src="https://img.shields.io/badge/frontend-Next.js_16_%2B_React_18-7c3aed?style=for-the-badge&labelColor=4b5563&logo=react&logoColor=white" />
+</p>
+
+<p align="center">
+  <img alt="TypeScript 5" src="https://img.shields.io/badge/typescript-5-3178c6?style=for-the-badge&labelColor=4b5563&logo=typescript&logoColor=white" />
+  <img alt="Java 17" src="https://img.shields.io/badge/java-17-2563eb?style=for-the-badge&labelColor=4b5563&logo=openjdk&logoColor=white" />
+  <img alt="Data H2 and PostgreSQL" src="https://img.shields.io/badge/data-H2_%7C_PostgreSQL-ea580c?style=for-the-badge&labelColor=4b5563&logo=postgresql&logoColor=white" />
+</p>
+
+<p align="center">
+  <a href="#how-to-run-the-project">Quick Start</a> |
+  <a href="#exact-project-scope">Scope</a> |
+  <a href="#current-data-support">Data Support</a> |
+  <a href="#main-backend-endpoints">API</a> |
+  <a href="#documentation">Docs</a>
 </p>
 
 ICT Trading Desk combines a Next.js charting workstation with a Spring Boot analysis API.
