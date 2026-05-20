@@ -8,6 +8,12 @@
   <strong>Full-stack ICT market-analysis workstation for chart replay, structure detection, and trade journaling.</strong>
 </p>
 
+<p align="center">
+  <strong>Stack:</strong> Next.js 16, React 18, TypeScript, Spring Boot 3.3, Java 17, H2/PostgreSQL
+  <br />
+  <strong>Demo:</strong> Local frontend at <code>http://localhost:3000</code> with backend API at <code>http://localhost:8080</code>
+</p>
+
 ICT Trading Desk combines a Next.js charting workstation with a Spring Boot analysis API.
 
 The `web/` app fetches public OHLC candles, renders the charting and replay UI, and sends candle windows to the `backend/` API. The Spring Boot backend performs the server-side ICT analysis, returns derived structures and trade setups, stores completed trades, and calculates setup performance weights that can be reused by the signal engine.
