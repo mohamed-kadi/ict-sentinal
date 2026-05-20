@@ -26,14 +26,21 @@ This project is currently an analysis, replay, and journaling tool. It is not a 
 - Stocks and index proxies: dedicated `web/src/app/api/stocks/klines/route.ts`, backed by Yahoo Finance with mock fallback. `US100` is mapped to the Nasdaq-100 index feed.
 
 ## Project structure
-- `backend/`: Spring Boot API, Flyway migration, JPA persistence, tests.
-- `web/`: Next.js frontend, app routes for market-data proxying, chart UI.
-- `docs/`: architecture and technical notes.
+- `web/`: Next.js frontend, market-data proxy routes, charting UI, and frontend-only utilities.
+- `backend/`: Spring Boot API, Flyway migration, JPA persistence, and backend tests.
+- `docs/`: shared architecture, technical, repository, and user-facing documentation.
+- `ops/`: reserved home for deployment, infrastructure, and environment automation artifacts.
+
+## Documentation
+- [Repository Guide](docs/REPOSITORY.md)
+- [Architecture Overview](docs/ARCHITECTURE.md)
+- [Technical Guide](docs/TECHNICAL.md)
+- [User Manual](docs/USER_MANUAL.md)
 
 ## Prerequisites
 - Java 17 for the backend build.
 - Maven 3.9+.
-- Node `24.15.0` for the frontend. The version is pinned in `web/.nvmrc` and `web/.node-version`.
+- Node `22.21.1` for the frontend. The version is pinned in `web/.nvmrc` and `web/.node-version`.
 
 ## How to run the project
 
@@ -108,4 +115,12 @@ Frontend:
 cd web
 npm run lint
 npm run typecheck
+```
+
+Optional frontend utility commands:
+
+```bash
+cd web
+npm run analyze:sample
+npm run debug:env
 ```

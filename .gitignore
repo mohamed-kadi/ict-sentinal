@@ -1,5 +1,34 @@
+# OS and editor files
 .DS_Store
 .metals/
 .vscode/
+
+# Local extension tooling
+.github/java-upgrade/
+
+# Backend build and local database state
 backend/data/
 backend/target/
+
+# Frontend dependencies and build outputs
+web/node_modules/
+web/.pnp
+web/.pnp.js
+web/coverage/
+web/.next/
+web/out/
+web/build/
+web/.vercel/
+web/.tools/
+web/dist-ict/
+
+# Frontend local env and generated files
+web/.env*.local
+web/next-env.d.ts
+web/*.tsbuildinfo
+
+# Debug logs and miscellaneous secrets
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.pem

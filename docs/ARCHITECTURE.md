@@ -1,41 +1,54 @@
 # Architecture Overview
 
+## Monorepo Boundaries
+- `web/`: Next.js application that owns market-data proxy routes, the dashboard UI, replay controls, and frontend state.
+- `backend/`: Spring Boot service that owns ICT signal analysis, trade journaling, and performance weighting.
+- `docs/`: shared documentation for contributors and operators.
+- `ops/`: reserved location for future deployment and infrastructure assets.
+
 ## Runtime Flow
-1) UI renders `Dashboard` (client component) → subscribes to app store (symbol, timeframe, overlays, backtest).
-2) `useCandles` fetches OHLC via app routes (`/api/crypto/klines`, `/api/forex/klines`, or `/api/stocks/klines`), cached by React Query.
-3) ICT computations (`src/lib/ict.ts`) derive bias, swings, FVGs, order blocks, and signals from the scoped candle window (live or backtest cursor).
-4) `ChartPanel` renders candles + overlays via Lightweight Charts and markers plugin; `InsightPanel` lists derived stats; `BacktestControls` updates the cursor.
+1. `web/src/components/Dashboard.tsx` orchestrates the active symbol, timeframe, overlays, replay state, and runtime notices.
+2. `useCandles` in `web/src/hooks/useCandles.ts` pulls normalized candles from the Next.js server routes:
+   - `/api/crypto/klines`
+   - `/api/forex/klines`
+   - `/api/stocks/klines`
+3. Those routes normalize third-party provider payloads into the shared candle shape `{ t, o, h, l, c, v }`.
+4. `useSignalAnalysis` posts the scoped candle window to `backend /api/v1/analysis/signals` when `NEXT_PUBLIC_BACKEND_BASE_URL` is configured.
+5. `backend/src/main/java/com/ictcrakr/backend/analysis/service/SignalAnalysisService.java` computes bias, structure, gaps, order blocks, sweeps, Model 2022 data, and trade setups.
+6. The frontend renders that response through:
+   - `ChartPanel` for overlays and drawings
+   - `InsightPanel` for recent signals
+   - `TradePanel` for journaling and performance context
+   - `InfoDrawer` and `RuntimeStatusPanel` for diagnostics
 
-## Client Composition
-- `src/components/Dashboard.tsx`: layout shell, orchestrates data + derived overlays, renders chart + insights + controls.
-- `ChartPanel`: lazy-loads Lightweight Charts, sets candlestick series, draws price lines for FVG/OB, and markers for swings/signals.
-- `ControlPanel`: user inputs (asset class, symbol, timeframe, overlay toggles, backtest switch).
-- `BacktestControls`: play/pause/step and speed, guarded by store.
-- `InsightPanel`: textual summary of bias, counts, and latest signals.
-- `TopBar`: headline info (current symbol/timeframe/bias).
+## Frontend Composition
+- `web/src/app/`: app shell and route handlers.
+- `web/src/components/`: visual workspace, chart, side panels, and journaling UI.
+- `web/src/hooks/`: data-fetching and backend-analysis hooks.
+- `web/src/lib/`: frontend utilities, DTOs, URL helpers, alert connectors, and session logic.
+- `web/src/state/`: Zustand store for the workspace state.
+- `web/scripts/`: frontend-only scripts and fixtures that should not ship as public assets.
 
-## State & Data
-- Global UI/backtest state: `src/state/useAppStore.ts` (Zustand). Shape includes `assetClass`, `symbol`, `timeframe`, `overlays`, `backtest.enabled/cursor/speed`.
-- Server data: React Query keyed by `[assetClass, symbol, timeframe]`. Backtest cursor simply slices the array client-side.
+## Backend Composition
+- `backend/.../analysis/api/`: request/response DTOs and analysis controller.
+- `backend/.../analysis/service/`: server-side ICT analysis engine.
+- `backend/.../trading/api/`: trade journal and performance endpoints.
+- `backend/.../trading/service/`: journaling and setup-performance aggregation.
+- `backend/.../trading/domain/` and `repository/`: persistence model and JPA access.
+- `backend/src/main/resources/db/migration/`: Flyway database migrations.
 
-## API Layer
-- `src/app/api/crypto/klines/route.ts`: Binance REST proxy; supports `symbol`, `interval`, `limit`, optional `startTime/endTime`.
-- `src/app/api/forex/klines/route.ts`: Twelve Data primary, Alpha Vantage fallback.
-- `src/app/api/stocks/klines/route.ts`: Yahoo Finance route for equities and `US100`, with mock fallback.
-- Both return normalized candles `{ t, o, h, l, c, v }` in epoch ms for chart compatibility.
+## Ownership Rules
+- Frontend owns provider normalization, replay UX, chart rendering, and client-side diagnostics.
+- Backend owns the canonical signal-analysis engine and trade-performance weighting.
+- Shared docs should describe boundaries and workflows, not duplicate source code.
 
-## ICT Logic Highlights (`src/lib/ict.ts`)
-- `computeBias`: compares current vs previous day ranges, open/close positioning, and sweep conditions.
-- `detectSwings`: rolling extrema with lookback window.
-- `detectFVG`: three-candle gap checks (bullish/bearish).
-- `detectOrderBlocks`: simple displacement check vs prior window.
-- `detectSignals`: session-aware, bias-conditioned triggers when candles tap OB/FVG zones.
+## Extension Points
+- Add market data providers under `web/src/app/api/`.
+- Add new frontend dashboards or controls under `web/src/components/`.
+- Add backend analysis endpoints under `backend/.../analysis/api/` and matching services under `analysis/service/`.
+- Add deployment and infrastructure material under `ops/` once the project formalizes containers, CI/CD, or IaC.
 
-## Extensibility Hooks
-- Overlay algorithms: strengthen in `src/lib/ict.ts`; results flow through `Dashboard` → `ChartPanel`.
-- Data sources: add new app routes and wire them in `useCandles` for other venues.
-- Chart primitives: add new price/area series or primitives in `ChartPanel` without touching store logic.
-
-## Known Constraints
-- REST candles cap at provided exchange intervals (Binance min 1m). Sub-minute accuracy requires websocket aggregation.
-- Backtest is client-only; no persistence or multi-session playback yet.
+## Current Constraints
+- Crypto uses REST candles plus a Binance websocket patch for the live candle.
+- Replay/backtest is a client-side slice of the loaded candle history.
+- The backend analysis is heuristic-based and should be validated with targeted fixtures as it evolves.
