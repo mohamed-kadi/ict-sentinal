@@ -1,4 +1,4 @@
-# ICT Trading Desk Web
+# ICT Trading Desk Frontend
 
 Next.js 16 frontend for the ICT Trading Desk workstation.
 
@@ -29,6 +29,14 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## Frontend structure
+- `src/app/`: Next.js app shell and server routes used to normalize market data.
+- `src/components/`: dashboard, chart, controls, status panels, and journaling UI.
+- `src/hooks/`: React Query and orchestration hooks for candles and backend analysis.
+- `src/lib/`: shared frontend utilities, DTOs, backend URL helpers, sessions, and scanner logic.
+- `src/state/`: Zustand store for workspace state, overlays, replay mode, and preferences.
+- `scripts/`: frontend-only utility scripts and fixtures that should not live in `public/`.
+
 ## Environment
 
 Create `web/.env.local` when needed:
@@ -57,15 +65,21 @@ Notes:
 
 ## Node runtime
 
-This app ships a repo-local Node toolchain in `web/.tools/node/current`.
+This app is pinned to Node `22.21.1` in `web/.nvmrc` and `web/.node-version`. It also supports a repo-local Node toolchain in `web/.tools/node/current`.
 
 - `npm run dev`
 - `npm run build`
 - `npm run start`
 - `npm run lint`
 - `npm run typecheck`
+- `npm run analyze:sample`
+- `npm run capture:fixture -- --assetClass crypto --symbol BTCUSDT --timeframe 15m --limit 300`
+- `npm run debug:env`
 
 all prepend that local Node binary automatically, so they do not depend on your global `node` path.
+
+`npm run analyze:sample` posts the static regression fixture in `scripts/fixtures/backtest-sample.json` to the backend analysis API.
+`npm run capture:fixture` saves a fresh normalized market snapshot from the local Next.js API routes into `scripts/fixtures/`.
 
 ## Verification
 
