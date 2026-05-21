@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import type {
   IChartApi,
@@ -34,10 +35,11 @@ import { classifySession } from "@/lib/sessions";
 import { alertRelayConfigured, alertRelayLabel, notifyAlertConnectors } from "@/lib/alertConnectors";
 import { CLOCK_OPTIONS, formatWithTz, getClockLabel } from "@/lib/time";
 import { evaluateIctScanner } from "@/lib/ictScanner";
-import { postTradeJournalEntry } from "@/lib/tradePerformance";
+import { postTradeJournalEntry, tradeJournalScopeQueryKey } from "@/lib/tradePerformance";
 import { useAppStore, type BacktestState, type BacktestTrade } from "@/state/useAppStore";
 import { useShallow } from "zustand/react/shallow";
 import { clamp } from "@/lib/utils";
+import { SidebarToggleButton } from "./SidebarToggleButton";
 
 const ADVANCED_SETUPS = new Set(["Silver Bullet", "Turtle Soup"]);
 const TIER_ONE_SETUPS = new Set([
@@ -73,7 +75,6 @@ const DRAWING_TOOLBAR_TOOLS = [
   { mode: "long" as const, label: "Long", shortLabel: "Long", title: "Long position" },
   { mode: "short" as const, label: "Short", shortLabel: "Short", title: "Short position" },
 ];
-const LAYERS_SIDEBAR_WIDTH = 320;
 
 function timeframeToMs(tf?: Timeframe) {
   switch (tf) {
@@ -101,6 +102,10 @@ function timeframeToMs(tf?: Timeframe) {
 type Props = {
   symbol?: string;
   timeframe?: Timeframe;
+  leftPanelOpen?: boolean;
+  rightPanelOpen?: boolean;
+  onToggleLeftPanel?: () => void;
+  onToggleRightPanel?: () => void;
   backtest?: BacktestState;
   backtestTotal?: number;
   candles: Candle[];
@@ -144,9 +149,58 @@ type Props = {
   >;
 };
 
+type HoverSnapshot = {
+  timeLabel: string | null;
+  point: { x: number; y: number } | null;
+  price: number | null;
+  candle: Candle | null;
+};
+
+const EMPTY_HOVER_SNAPSHOT: HoverSnapshot = {
+  timeLabel: null,
+  point: null,
+  price: null,
+  candle: null,
+};
+
+function areHoverPointsEqual(
+  left: HoverSnapshot["point"],
+  right: HoverSnapshot["point"],
+) {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return left.x === right.x && left.y === right.y;
+}
+
+function areCandlesEqual(left: Candle | null, right: Candle | null) {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return (
+    left.t === right.t &&
+    left.o === right.o &&
+    left.h === right.h &&
+    left.l === right.l &&
+    left.c === right.c &&
+    left.v === right.v
+  );
+}
+
+function areHoverSnapshotsEqual(left: HoverSnapshot, right: HoverSnapshot) {
+  return (
+    left.timeLabel === right.timeLabel &&
+    left.price === right.price &&
+    areHoverPointsEqual(left.point, right.point) &&
+    areCandlesEqual(left.candle, right.candle)
+  );
+}
+
 export function ChartPanel({
   symbol,
   timeframe,
+  leftPanelOpen = true,
+  rightPanelOpen = true,
+  onToggleLeftPanel,
+  onToggleRightPanel,
   backtest,
   backtestTotal,
   candles,
@@ -173,6 +227,7 @@ export function ChartPanel({
   takeSignalPromptToken,
   overlays,
 }: Props) {
+  const queryClient = useQueryClient();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -199,7 +254,6 @@ export function ChartPanel({
     notificationsEnabled,
     waitForRetest,
     optimizerEnabled,
-    sidebarOpen,
     addTrade,
     trades,
     updateTrade,
@@ -219,7 +273,6 @@ export function ChartPanel({
       notificationsEnabled: state.notificationsEnabled,
       waitForRetest: state.waitForRetest,
       optimizerEnabled: state.optimizerEnabled,
-      sidebarOpen: state.sidebarOpen,
       addTrade: state.addTrade,
       trades: state.backtest.trades,
       updateTrade: state.updateTrade,
@@ -233,7 +286,7 @@ export function ChartPanel({
   candlesSnapshotRef.current = candles;
   const clockTzRef = useRef(clockTz);
   clockTzRef.current = clockTz;
-  const [hoverTzTime, setHoverTzTime] = useState<string | null>(null);
+  const [hoverSnapshot, setHoverSnapshot] = useState<HoverSnapshot>(EMPTY_HOVER_SNAPSHOT);
   const [lastTzTime, setLastTzTime] = useState<string | null>(null);
   const [timelineTicks, setTimelineTicks] = useState<{ label: string; position: number }[]>([]);
   type SessionShade = {
@@ -423,6 +476,8 @@ export function ChartPanel({
         overrides.armedAt == null;
       const trade: BacktestTrade = {
         id: overrides.id ?? `bt-${signal.setup ?? "ict"}-${signal.time}-${Math.random().toString(36).slice(2, 6)}`,
+        symbol,
+        timeframe,
         direction: overrides.direction ?? signal.direction,
         entry: overrides.entry ?? signal.price,
         stop,
@@ -449,7 +504,7 @@ export function ChartPanel({
       seenSignalIdsRef.current.add(signalId);
       return trade;
     },
-    [addTrade, buildSignalId, retestWindowMs, supportsRetestEntry, waitForRetest],
+    [addTrade, buildSignalId, retestWindowMs, symbol, supportsRetestEntry, timeframe, waitForRetest],
   );
   const runAutoBacktest = () => {
     if (!backtest?.enabled || !patchBacktest) {
@@ -609,9 +664,13 @@ export function ChartPanel({
     },
     [convertCoordTime],
   );
-  const [hoverPoint, setHoverPoint] = useState<{ x: number; y: number } | null>(null);
-  const [hoverPrice, setHoverPrice] = useState<number | null>(null);
-  const [hoverCandle, setHoverCandle] = useState<Candle | null>(null);
+  const hoverSnapshotRef = useRef<HoverSnapshot>(EMPTY_HOVER_SNAPSHOT);
+  const pendingHoverSnapshotRef = useRef<HoverSnapshot | null>(null);
+  const hoverFrameRef = useRef<number | null>(null);
+  const hoverPoint = hoverSnapshot.point;
+  const hoverPrice = hoverSnapshot.price;
+  const hoverCandle = hoverSnapshot.candle;
+  const hoverTzTime = hoverSnapshot.timeLabel;
   const [autoStartPct, setAutoStartPct] = useState(0);
   const [autoEndPct, setAutoEndPct] = useState(100);
   const [autoSummary, setAutoSummary] = useState<{ trades: number; wins: number; losses: number } | null>(null);
@@ -635,6 +694,30 @@ export function ChartPanel({
   );
   const seenSignalIdsRef = useRef<Set<string>>(new Set());
   const processedTradeIdsRef = useRef<Set<string>>(new Set());
+  const flushHoverSnapshot = useCallback((next: HoverSnapshot) => {
+    if (areHoverSnapshotsEqual(hoverSnapshotRef.current, next)) return;
+    hoverSnapshotRef.current = next;
+    setHoverSnapshot(next);
+  }, []);
+  const queueHoverSnapshot = useCallback(
+    (next: HoverSnapshot) => {
+      if (typeof window === "undefined") {
+        flushHoverSnapshot(next);
+        return;
+      }
+      pendingHoverSnapshotRef.current = next;
+      if (hoverFrameRef.current != null) return;
+      hoverFrameRef.current = window.requestAnimationFrame(() => {
+        hoverFrameRef.current = null;
+        const pending = pendingHoverSnapshotRef.current;
+        pendingHoverSnapshotRef.current = null;
+        if (pending) {
+          flushHoverSnapshot(pending);
+        }
+      });
+    },
+    [flushHoverSnapshot],
+  );
   const copySetupStats = useCallback(() => {
     if (!Object.keys(setupStats).length || typeof navigator === "undefined") return;
     const payload = Object.entries(setupStats)
@@ -670,8 +753,8 @@ export function ChartPanel({
           ? trade.target
           : trade.stop;
     postTradeJournalEntry({
-      symbol,
-      timeframe,
+      symbol: trade.symbol ?? symbol,
+      timeframe: trade.timeframe ?? timeframe,
       setup: trade.setup,
       session: trade.sessionLabel ?? "Unknown",
       bias: trade.biasLabel ?? "Neutral",
@@ -684,8 +767,14 @@ export function ChartPanel({
       takeProfitPrice: trade.target,
       executedAt: trade.openTime ?? trade.exitTime ?? Date.now(),
       closedAt: trade.exitTime ?? Date.now(),
-    }).catch(() => {});
-  }, [symbol, timeframe]);
+    })
+      .then(() =>
+        queryClient.invalidateQueries({
+          queryKey: tradeJournalScopeQueryKey(trade.symbol ?? symbol, trade.timeframe ?? timeframe),
+        }),
+      )
+      .catch(() => {});
+  }, [queryClient, symbol, timeframe]);
   useEffect(() => {
     setPendingPoints([]);
     setPreviewPoint(null);
@@ -1674,10 +1763,9 @@ export function ChartPanel({
       ? "Choose a drawing tool. Drag tools draw on click-and-drag."
       : drawingMode === "hline"
         ? "Click once on the chart to place a horizontal level."
-        : drawingMode === "long" || drawingMode === "short"
+      : drawingMode === "long" || drawingMode === "short"
           ? "Click and drag to set entry and stop. Target is previewed automatically."
           : "Click and drag on the chart. Press Esc to cancel the active tool.";
-  const toolbarShift = sidebarOpen ? LAYERS_SIDEBAR_WIDTH / 2 : 0;
 
   useEffect(() => {
     if (drawingMode === "none" && !panMode && pendingPoints.length === 0 && !isPointerDown) return;
@@ -1779,9 +1867,11 @@ export function ChartPanel({
 
       resizeObserver = new ResizeObserver((entries) => {
         const { width, height } = entries[0].contentRect;
-        setChartWidth((prev) => (prev === width ? prev : width));
-        setChartHeight((prev) => (prev === height ? prev : height));
-        chart?.applyOptions({ width, height });
+        const nextWidth = Math.round(width);
+        const nextHeight = Math.round(height);
+        setChartWidth((prev) => (prev === nextWidth ? prev : nextWidth));
+        setChartHeight((prev) => (prev === nextHeight ? prev : nextHeight));
+        chart?.applyOptions({ width: nextWidth, height: nextHeight });
       });
       resizeObserver.observe(containerRef.current);
     };
@@ -1806,6 +1896,16 @@ export function ChartPanel({
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (hoverFrameRef.current != null && typeof window !== "undefined") {
+        window.cancelAnimationFrame(hoverFrameRef.current);
+      }
+      hoverFrameRef.current = null;
+      pendingHoverSnapshotRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
     const timeScale = chart.timeScale();
@@ -1825,6 +1925,32 @@ export function ChartPanel({
   }, []);
 
   useEffect(() => () => stopViewportSync(), [stopViewportSync]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let firstFrame: number | null = null;
+    let secondFrame: number | null = null;
+    const syncLayout = () => {
+      const chart = chartRef.current;
+      const container = containerRef.current;
+      if (!chart || !container) return;
+      const nextWidth = Math.round(container.clientWidth);
+      const nextHeight = Math.round(container.clientHeight);
+      if (nextWidth <= 0 || nextHeight <= 0) return;
+      setChartWidth((prev) => (prev === nextWidth ? prev : nextWidth));
+      setChartHeight((prev) => (prev === nextHeight ? prev : nextHeight));
+      chart.applyOptions({ width: nextWidth, height: nextHeight });
+      nudgeViewportSync(220);
+    };
+    firstFrame = window.requestAnimationFrame(() => {
+      syncLayout();
+      secondFrame = window.requestAnimationFrame(syncLayout);
+    });
+    return () => {
+      if (firstFrame != null) window.cancelAnimationFrame(firstFrame);
+      if (secondFrame != null) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [leftPanelOpen, rightPanelOpen, nudgeViewportSync]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -2599,24 +2725,19 @@ export function ChartPanel({
     const handler = (param: any) => {
       const time = param?.time;
       if (!time) {
-        setHoverTzTime(null);
-        setHoverPoint(null);
-        setHoverPrice(null);
-        setHoverCandle(null);
+        queueHoverSnapshot(EMPTY_HOVER_SNAPSHOT);
         return;
       }
       const ms = convertCoordTime(time);
-      setHoverTzTime(ms ? formatWithTz(ms, clockTz, TIME_LABEL_FORMAT) : null);
       const pt = param?.point;
       let cursorPrice: number | null = null;
+      let point: HoverSnapshot["point"] = null;
       if (pt && Number.isFinite(pt.x) && Number.isFinite(pt.y)) {
-        setHoverPoint({ x: pt.x, y: pt.y });
+        point = { x: pt.x, y: pt.y };
         const coordPrice = seriesRef.current?.coordinateToPrice(pt.y) ?? null;
         if (typeof coordPrice === "number" && Number.isFinite(coordPrice)) {
           cursorPrice = coordPrice;
         }
-      } else {
-        setHoverPoint(null);
       }
       const series = seriesRef.current;
       let barPrice: number | null = null;
@@ -2652,15 +2773,19 @@ export function ChartPanel({
           }
         }
       }
-      setHoverCandle(derivedCandle);
       const fallbackPrice = typeof param?.price === "number" ? param.price : null;
-      setHoverPrice(cursorPrice ?? barPrice ?? fallbackPrice);
+      queueHoverSnapshot({
+        timeLabel: ms ? formatWithTz(ms, clockTz, TIME_LABEL_FORMAT) : null,
+        point,
+        price: cursorPrice ?? barPrice ?? fallbackPrice,
+        candle: derivedCandle,
+      });
     };
     chart.subscribeCrosshairMove(handler);
     return () => {
       chart.unsubscribeCrosshairMove(handler);
     };
-  }, [markersPluginReady, clockTz, convertCoordTime]);
+  }, [markersPluginReady, clockTz, convertCoordTime, queueHoverSnapshot]);
 
   useEffect(() => {
     if (!seriesRef.current) return;
@@ -2716,12 +2841,6 @@ export function ChartPanel({
   }, [orderBlocks, overlays.orderBlocks]);
 
   useEffect(() => {
-    const wantsAuto = Boolean(backtest?.autoTrade);
-    if (!notificationsEnabled && !wantsAuto) {
-      setSignalPrompt(null);
-      setSignalPromptScore(null);
-      return;
-    }
     if (promptSignals.length === 0) {
       setSignalPrompt(null);
       setSignalPromptScore(null);
@@ -2839,7 +2958,7 @@ export function ChartPanel({
   ]);
 
   useEffect(() => {
-    if (!notificationsEnabled || !signalPrompt) return;
+    if (!signalPrompt) return;
     const evalResult = evaluateIctScanner({
       signal: signalPrompt,
       bias,
@@ -2847,15 +2966,16 @@ export function ChartPanel({
       latestPrice: latestPrice ?? signalPrompt.price,
     });
     setSignalPromptScore(evalResult.score);
-  }, [signalPrompt, notificationsEnabled, bias, premiumDiscount, latestPrice]);
+  }, [signalPrompt, bias, premiumDiscount, latestPrice]);
 
   const overlayActive = drawingMode !== "none";
   const panelCursor = panMode ? (isPanning ? "grabbing" : "grab") : drawingMode === "none" ? "default" : "crosshair";
   const overlayCursor = drawingMode === "none" ? "default" : "crosshair";
   const activeTimeLabel = hoverTzTime ?? lastTzTime ?? "—";
   const clockLabel = getClockLabel(clockTz);
+  const statusCandle = hoverCandle ?? candles.at(-1) ?? null;
   const hoverPriceLabel = hoverPrice != null ? formatPrice(hoverPrice) : null;
-  const headerStatusActive = Boolean(dataSource || hoverCandle || backtest?.enabled || notificationsEnabled);
+  const headerStatusActive = Boolean(dataSource || statusCandle || backtest?.enabled || notificationsEnabled);
   const manualMenuStyle = manualTradePrompt
     ? (() => {
         const containerWidth = containerRef.current?.clientWidth ?? manualTradePrompt.x + 200;
@@ -2877,113 +2997,135 @@ export function ChartPanel({
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
       <div className="shrink-0 border-b border-white/10 bg-[#060b18]/90 px-3 py-2">
-        <div className="relative flex flex-col gap-2">
-          <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            <div
-              className="mx-auto flex min-w-max flex-col items-center gap-2 transition-transform duration-200"
-              style={{ transform: `translateX(${toolbarShift}px)` }}
-            >
-              <div className="flex flex-wrap items-center justify-center gap-2 rounded-full border border-white/10 bg-[#0b1220]/95 px-2 py-1 shadow-[0_14px_34px_rgba(0,0,0,0.35)]">
-                <button
-                  className={clsx(
-                    "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
-                    panMode
-                      ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-200"
-                      : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700",
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex min-w-max flex-col items-start gap-2">
+                <div className="flex flex-wrap items-center gap-2 rounded-full border border-white/10 bg-[#0b1220]/95 px-2 py-1 shadow-[0_14px_34px_rgba(0,0,0,0.35)]">
+                  {!leftPanelOpen && onToggleLeftPanel && (
+                    <SidebarToggleButton
+                      open={false}
+                      onClick={onToggleLeftPanel}
+                      title="Open layers"
+                      ariaLabel="Open layers"
+                      className="h-9 w-9 shrink-0 text-zinc-400 hover:text-zinc-100"
+                    />
                   )}
-                  onClick={togglePanMode}
-                  title="Pan chart"
-                >
-                  ✋ Pan
-                </button>
-                {DRAWING_TOOLBAR_TOOLS.map((tool) => (
                   <button
-                    key={tool.mode}
                     className={clsx(
                       "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
-                      drawingMode === tool.mode
+                      panMode
                         ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-200"
                         : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700",
                     )}
-                    onClick={() => setDrawingMode(drawingMode === tool.mode ? "none" : tool.mode)}
-                    title={tool.title}
+                    onClick={togglePanMode}
+                    title="Pan chart"
                   >
-                    <span className="hidden sm:inline">{tool.label}</span>
-                    <span className="sm:hidden">{tool.shortLabel}</span>
+                    ✋ Pan
                   </button>
-                ))}
-                {drawings.length > 0 && (
-                  <button
-                    className="rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] font-semibold text-zinc-300 transition hover:border-rose-500/50 hover:text-rose-200"
-                    onClick={clearDrawings}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <div className="text-center text-[10px] text-zinc-400">
-                {drawingHint}
+                  {DRAWING_TOOLBAR_TOOLS.map((tool) => (
+                    <button
+                      key={tool.mode}
+                      className={clsx(
+                        "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition",
+                        drawingMode === tool.mode
+                          ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-200"
+                          : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700",
+                      )}
+                      onClick={() => setDrawingMode(drawingMode === tool.mode ? "none" : tool.mode)}
+                      title={tool.title}
+                    >
+                      <span className="hidden sm:inline">{tool.label}</span>
+                      <span className="sm:hidden">{tool.shortLabel}</span>
+                    </button>
+                  ))}
+                  {drawings.length > 0 && (
+                    <button
+                      className="rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] font-semibold text-zinc-300 transition hover:border-rose-500/50 hover:text-rose-200"
+                      onClick={clearDrawings}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="text-left text-[10px] text-zinc-400">
+                  {drawingHint}
+                </div>
               </div>
             </div>
           </div>
-          {headerStatusActive && (
-            <div className="flex flex-wrap justify-end gap-1.5 lg:absolute lg:right-0 lg:top-0 lg:max-w-[28rem] lg:flex-col lg:items-end">
-              {dataSource && (
-                <div className="w-fit max-w-full rounded bg-black/70 px-2 py-1 text-[11px] text-zinc-200 shadow">
-                  Data: {dataSource}
+          {(headerStatusActive || (!rightPanelOpen && onToggleRightPanel)) && (
+            <div className="flex flex-wrap items-start justify-end gap-2">
+              {headerStatusActive && (
+                <div className="flex flex-wrap gap-1.5 lg:max-w-[28rem] lg:flex-col lg:items-end lg:text-right">
+                  {dataSource && (
+                    <div className="w-fit max-w-full rounded bg-black/70 px-2 py-1 text-[11px] text-zinc-200 shadow">
+                      Data: {dataSource}
+                    </div>
+                  )}
+                  {statusCandle && (
+                    <div className="min-w-[15rem] max-w-full rounded bg-black/70 px-2 py-1 text-[10px] text-white shadow">
+                      <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-right">
+                        <span>
+                          <span className="text-sky-300">O</span> {formatPrice(statusCandle.o)}
+                        </span>
+                        <span>
+                          <span className="text-emerald-300">H</span> {formatPrice(statusCandle.h)}
+                        </span>
+                        <span>
+                          <span className="text-rose-300">L</span> {formatPrice(statusCandle.l)}
+                        </span>
+                        <span>
+                          <span className="text-amber-200">C</span> {formatPrice(statusCandle.c)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {backtest?.enabled && (
+                    <div className="w-fit max-w-full rounded bg-emerald-900/70 px-2 py-1 text-[10px] text-emerald-100 shadow">
+                      Backtest • {backtestCurrent ?? 0}
+                      {backtestTotal ? ` / ${backtestTotal}` : ''}{' '}
+                      <span className="text-emerald-300">{backtest?.playing ? 'Playing' : 'Paused'}</span>
+                    </div>
+                  )}
+                  {notificationsEnabled && (
+                    <div
+                      className="w-fit max-w-full rounded px-2 py-1 text-[10px] text-right shadow"
+                      style={{
+                        backgroundColor:
+                          alertStatus?.status === "live"
+                            ? "rgba(16,185,129,0.2)"
+                            : alertStatus?.status === "paused"
+                              ? "rgba(251,191,36,0.2)"
+                              : "rgba(248,113,113,0.2)",
+                        color:
+                          alertStatus?.status === "live"
+                            ? "#bbf7d0"
+                            : alertStatus?.status === "paused"
+                              ? "#fde68a"
+                              : "#fecaca",
+                      }}
+                    >
+                      {alertStatus?.message ?? "Entry alerts enabled"}
+                      {alertStatus?.detail ? (
+                        <>
+                          <br />
+                          <span className="text-[9px] opacity-80">{alertStatus.detail}</span>
+                        </>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               )}
-              {hoverCandle && (
-                <div className="w-fit max-w-full rounded bg-black/70 px-2 py-1 text-[10px] text-white shadow">
-                  <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-right">
-                    <span>
-                      <span className="text-sky-300">O</span> {formatPrice(hoverCandle.o)}
-                    </span>
-                    <span>
-                      <span className="text-emerald-300">H</span> {formatPrice(hoverCandle.h)}
-                    </span>
-                    <span>
-                      <span className="text-rose-300">L</span> {formatPrice(hoverCandle.l)}
-                    </span>
-                    <span>
-                      <span className="text-amber-200">C</span> {formatPrice(hoverCandle.c)}
-                    </span>
-                  </div>
-                </div>
-              )}
-              {backtest?.enabled && (
-                <div className="w-fit max-w-full rounded bg-emerald-900/70 px-2 py-1 text-[10px] text-emerald-100 shadow">
-                  Backtest • {backtestCurrent ?? 0}
-                  {backtestTotal ? ` / ${backtestTotal}` : ''}{' '}
-                  <span className="text-emerald-300">{backtest?.playing ? 'Playing' : 'Paused'}</span>
-                </div>
-              )}
-              {notificationsEnabled && (
-                <div
-                  className="w-fit max-w-full rounded px-2 py-1 text-[10px] text-right shadow"
-                  style={{
-                    backgroundColor:
-                      alertStatus?.status === "live"
-                        ? "rgba(16,185,129,0.2)"
-                        : alertStatus?.status === "paused"
-                          ? "rgba(251,191,36,0.2)"
-                          : "rgba(248,113,113,0.2)",
-                    color:
-                      alertStatus?.status === "live"
-                        ? "#bbf7d0"
-                        : alertStatus?.status === "paused"
-                          ? "#fde68a"
-                          : "#fecaca",
-                  }}
-                >
-                  {alertStatus?.message ?? "Entry alerts enabled"}
-                  {alertStatus?.detail ? (
-                    <>
-                      <br />
-                      <span className="text-[9px] opacity-80">{alertStatus.detail}</span>
-                    </>
-                  ) : null}
-                </div>
+              {!rightPanelOpen && onToggleRightPanel && (
+                <SidebarToggleButton
+                  open={false}
+                  side="right"
+                  onClick={onToggleRightPanel}
+                  title="Open right panel"
+                  ariaLabel="Open right panel"
+                  className="h-9 w-9 shrink-0 self-start text-zinc-400 hover:text-zinc-100"
+                />
               )}
             </div>
           )}

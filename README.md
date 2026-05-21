@@ -132,6 +132,7 @@ Notes:
 ## Main backend endpoints
 - `POST /api/v1/analysis/signals`
 - `POST /api/v1/trades`
+- `GET /api/v1/trades`
 - `GET /api/v1/trades/performance`
 
 ## Useful commands

@@ -2,6 +2,8 @@ package com.ictcrakr.backend.trading.service;
 
 import com.ictcrakr.backend.trading.api.CreateTradeRequest;
 import com.ictcrakr.backend.trading.api.TradeEntryResponse;
+import com.ictcrakr.backend.trading.api.TradeJournalEntriesResponse;
+import com.ictcrakr.backend.trading.api.TradeJournalEntrySummaryResponse;
 import com.ictcrakr.backend.trading.api.TradePerformanceResponse;
 import com.ictcrakr.backend.trading.api.TradePerformanceSetupResponse;
 import com.ictcrakr.backend.trading.config.TradeAnalysisProperties;
@@ -62,29 +64,7 @@ public class TradeJournalService {
     String timeframe,
     Integer lookbackDays
   ) {
-    Specification<TradeJournalEntry> filters = alwaysTrue();
-
-    if (StringUtils.hasText(symbol)) {
-      String normalizedSymbol = normalizeUpper(symbol);
-      filters = filters.and(
-        (root, query, cb) -> cb.equal(cb.upper(root.get("symbol")), normalizedSymbol)
-      );
-    }
-
-    if (StringUtils.hasText(timeframe)) {
-      String normalizedTimeframe = normalizeToken(timeframe);
-      filters = filters.and(
-        (root, query, cb) -> cb.equal(cb.upper(root.get("timeframe")), normalizedTimeframe)
-      );
-    }
-
-    if (lookbackDays != null && lookbackDays > 0) {
-      Instant cutoff = Instant.now().minus(lookbackDays, ChronoUnit.DAYS);
-      filters = filters.and(
-        (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("closedAt"), cutoff)
-      );
-    }
-
+    Specification<TradeJournalEntry> filters = buildFilters(symbol, timeframe, lookbackDays);
     List<TradeJournalEntry> entries = repository.findAll(
       filters,
       Sort.by(Sort.Order.desc("closedAt"), Sort.Order.desc("createdAt"))
@@ -165,8 +145,80 @@ public class TradeJournalService {
     );
   }
 
+  public TradeJournalEntriesResponse getRecentTrades(
+    String symbol,
+    String timeframe,
+    Integer lookbackDays,
+    Integer limit
+  ) {
+    Specification<TradeJournalEntry> filters = buildFilters(symbol, timeframe, lookbackDays);
+    List<TradeJournalEntry> entries = repository.findAll(
+      filters,
+      Sort.by(Sort.Order.desc("closedAt"), Sort.Order.desc("createdAt"))
+    );
+    int normalizedLimit = limit == null ? 20 : limit;
+    List<TradeJournalEntrySummaryResponse> items = entries.stream()
+      .limit(normalizedLimit)
+      .map(this::toSummaryResponse)
+      .toList();
+
+    return new TradeJournalEntriesResponse(entries.size(), items);
+  }
+
   private static Specification<TradeJournalEntry> alwaysTrue() {
     return (root, query, cb) -> cb.conjunction();
+  }
+
+  private Specification<TradeJournalEntry> buildFilters(
+    String symbol,
+    String timeframe,
+    Integer lookbackDays
+  ) {
+    Specification<TradeJournalEntry> filters = alwaysTrue();
+
+    if (StringUtils.hasText(symbol)) {
+      String normalizedSymbol = normalizeUpper(symbol);
+      filters = filters.and(
+        (root, query, cb) -> cb.equal(cb.upper(root.get("symbol")), normalizedSymbol)
+      );
+    }
+
+    if (StringUtils.hasText(timeframe)) {
+      String normalizedTimeframe = normalizeToken(timeframe);
+      filters = filters.and(
+        (root, query, cb) -> cb.equal(cb.upper(root.get("timeframe")), normalizedTimeframe)
+      );
+    }
+
+    if (lookbackDays != null && lookbackDays > 0) {
+      Instant cutoff = Instant.now().minus(lookbackDays, ChronoUnit.DAYS);
+      filters = filters.and(
+        (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("closedAt"), cutoff)
+      );
+    }
+
+    return filters;
+  }
+
+  private TradeJournalEntrySummaryResponse toSummaryResponse(TradeJournalEntry entry) {
+    return new TradeJournalEntrySummaryResponse(
+      entry.getId(),
+      entry.getSymbol(),
+      entry.getTimeframe(),
+      entry.getSetupName(),
+      entry.getSessionName(),
+      entry.getMarketBias(),
+      entry.getDirection(),
+      entry.getResult(),
+      entry.getRMultiple(),
+      entry.getEntryPrice(),
+      entry.getExitPrice(),
+      entry.getStopPrice(),
+      entry.getTakeProfitPrice(),
+      entry.getExecutedAt(),
+      entry.getClosedAt(),
+      entry.getCreatedAt()
+    );
   }
 
   private static String normalizeUpper(String value) {

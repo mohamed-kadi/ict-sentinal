@@ -9,6 +9,8 @@ This service receives candle data from the Next.js client, calculates the tradin
   Accepts candles and returns bias, signals, swings, FVGs, order blocks, BOS/CHoCH shifts, sweeps, equal highs/lows, breaker blocks, premium/discount range, HTF levels, and Model 2022 data.
 - `POST /api/v1/trades`
   Stores a completed trade journal entry.
+- `GET /api/v1/trades`
+  Returns recent persisted journal entries, optionally filtered by symbol, timeframe, lookback window, and limit.
 - `GET /api/v1/trades/performance`
   Aggregates journal performance by setup and returns `allowed` and `sizeMultiplier` fields used by the signal optimizer.
 - Flyway manages the `trade_journal_entries` schema.

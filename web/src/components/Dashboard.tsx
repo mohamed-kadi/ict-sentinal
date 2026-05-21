@@ -40,9 +40,11 @@ export function Dashboard() {
     setBacktest,
     selectedSetup,
     sidebarOpen,
+    insightOpen,
     infoOpen,
     optimizerEnabled,
     toggleSidebar,
+    toggleInsight,
   } = useAppStore();
   const {
     candles = EMPTY_CANDLES,
@@ -215,14 +217,23 @@ export function Dashboard() {
     setActiveSignalPromptScore(null);
     setTakeSignalPromptToken((value) => value + 1);
   }, []);
+  const dockedSidebarShellClass = insightOpen ? 'hidden 2xl:block 2xl:shrink-0' : 'hidden xl:block xl:shrink-0';
+  const overlaySidebarClass = insightOpen ? '2xl:hidden' : 'xl:hidden';
 
   return (
     <div className="flex h-screen flex-col bg-zinc-950 text-white">
       <TopBar symbol={symbol} timeframe={timeframe} bias={displayBias} latestOhlc={latestOhlc} />
       <div className="relative flex flex-1 min-h-0 overflow-hidden">
+        {sidebarOpen && (
+          <div className={dockedSidebarShellClass}>
+            <div className="h-full bg-zinc-950/95 shadow-2xl shadow-black/60">
+              <ControlPanel supportedSetups={supportedSetups} />
+            </div>
+          </div>
+        )}
         <div
           className={`
-            absolute top-0 bottom-0 left-0 z-40 w-80 transform transition-transform duration-200
+            absolute top-0 bottom-0 left-0 z-40 w-80 transform transition-transform duration-200 ${overlaySidebarClass}
             ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           `}
         >
@@ -230,17 +241,6 @@ export function Dashboard() {
             <ControlPanel supportedSetups={supportedSetups} />
           </div>
         </div>
-        {!sidebarOpen && (
-          <button
-            type="button"
-            className="absolute left-3 top-3 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-950/90 text-sm font-semibold text-zinc-200 shadow-lg shadow-black/40 transition hover:border-emerald-500/60 hover:text-emerald-200"
-            onClick={() => toggleSidebar()}
-            title="Open layers"
-            aria-label="Open layers"
-          >
-            <span className="leading-none">☰</span>
-          </button>
-        )}
         <div
           className={`
             absolute top-0 bottom-0 right-0 z-40 w-80 transform transition-transform duration-200
@@ -303,9 +303,13 @@ export function Dashboard() {
                   <RuntimeStatusPanel items={runtimeIssues} />
                 </div>
               )}
-              <div className="flex flex-1 min-h-0">
-                <div className="flex-1 min-h-0">
+              <div className="flex min-h-0 min-w-0 flex-1">
+                <div className="min-h-0 min-w-0 flex-1">
                   <ChartPanel
+                    leftPanelOpen={sidebarOpen}
+                    rightPanelOpen={insightOpen}
+                    onToggleLeftPanel={() => toggleSidebar()}
+                    onToggleRightPanel={() => toggleInsight()}
                     backtest={backtest}
                     backtestTotal={candles.length}
                     symbol={symbol}
@@ -335,33 +339,35 @@ export function Dashboard() {
                     takeSignalPromptToken={takeSignalPromptToken}
                   />
                 </div>
-                <InsightPanel
-                  symbol={symbol}
-                  assetClass={assetClass}
-                  latestPrice={latestPrice ?? undefined}
-                  priceChangeAbs={priceChangeAbs ?? undefined}
-                  priceChangePct={priceChangePct ?? undefined}
-                  marketOpen={marketOpen}
-                  dataSource={providerLabel}
-                  bias={displayBias}
-                  swings={swings}
-                  gaps={gaps}
-                  orderBlocks={orderBlocks}
-                  signals={notificationSignals}
-                  selectedSetup={selectedSetup}
-                  ictScanner={ictScanner}
-                  premiumDiscount={premiumDiscount}
-                  activeSignal={activeSignalPrompt}
-                  activeSignalScore={activeSignalPromptScore}
-                  backtestEnabled={backtest.enabled}
-                  onTakeActiveSignal={takeActiveSignalPrompt}
-                  onDismissActiveSignal={dismissActiveSignalPrompt}
-                  hasMoreHistory={hasMore}
-                  isFetchingOlderHistory={isFetchingOlder}
-                  onFetchOlderHistory={fetchOlder}
-                  latestSignalTime={latestSignalTime}
-                  actionableSignalTime={actionableSignalTime}
-                />
+                {insightOpen && (
+                  <InsightPanel
+                    symbol={symbol}
+                    assetClass={assetClass}
+                    latestPrice={latestPrice ?? undefined}
+                    priceChangeAbs={priceChangeAbs ?? undefined}
+                    priceChangePct={priceChangePct ?? undefined}
+                    marketOpen={marketOpen}
+                    dataSource={providerLabel}
+                    bias={displayBias}
+                    swings={swings}
+                    gaps={gaps}
+                    orderBlocks={orderBlocks}
+                    signals={notificationSignals}
+                    selectedSetup={selectedSetup}
+                    ictScanner={ictScanner}
+                    premiumDiscount={premiumDiscount}
+                    activeSignal={activeSignalPrompt}
+                    activeSignalScore={activeSignalPromptScore}
+                    backtestEnabled={backtest.enabled}
+                    onTakeActiveSignal={takeActiveSignalPrompt}
+                    onDismissActiveSignal={dismissActiveSignalPrompt}
+                    hasMoreHistory={hasMore}
+                    isFetchingOlderHistory={isFetchingOlder}
+                    onFetchOlderHistory={fetchOlder}
+                    latestSignalTime={latestSignalTime}
+                    actionableSignalTime={actionableSignalTime}
+                  />
+                )}
               </div>
             </>
           )}

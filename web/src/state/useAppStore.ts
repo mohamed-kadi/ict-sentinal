@@ -29,6 +29,8 @@ type OverlayKey =
 
 export type BacktestTrade = {
   id: string;
+  symbol?: string;
+  timeframe?: Timeframe;
   direction: 'buy' | 'sell';
   entry: number;
   stop: number;
@@ -95,6 +97,7 @@ type AppState = {
   selectedSetup: string;
   backtest: BacktestState;
   sidebarOpen: boolean;
+  insightOpen: boolean;
   infoOpen: boolean;
   drawingMode: DrawingType | 'none';
   drawings: Drawing[];
@@ -111,6 +114,7 @@ type AppState = {
   addTrade: (trade: BacktestTrade) => void;
   clearTrades: () => void;
   toggleSidebar: () => void;
+  toggleInsight: () => void;
   toggleInfo: () => void;
   setDrawingMode: (mode: DrawingType | 'none') => void;
   addDrawing: (drawing: Drawing) => void;
@@ -155,6 +159,7 @@ export const useAppStore = create<AppState>()(
       selectedSetup: 'all',
       backtest: { enabled: false, playing: false, speed: 1, cursor: 0, trades: [], balance: 0, autoTrade: false },
       sidebarOpen: true,
+      insightOpen: true,
       infoOpen: false,
       drawingMode: 'none',
       drawings: [],
@@ -200,6 +205,10 @@ export const useAppStore = create<AppState>()(
       toggleSidebar: () =>
         set((state) => ({
           sidebarOpen: !state.sidebarOpen,
+        })),
+      toggleInsight: () =>
+        set((state) => ({
+          insightOpen: !state.insightOpen,
         })),
       toggleInfo: () =>
         set((state) => ({
@@ -254,6 +263,7 @@ export const useAppStore = create<AppState>()(
         selectedSetup: state.selectedSetup,
         backtest: state.backtest,
         sidebarOpen: state.sidebarOpen,
+        insightOpen: state.insightOpen,
         infoOpen: state.infoOpen,
         drawingMode: state.drawingMode,
         drawings: state.drawings,

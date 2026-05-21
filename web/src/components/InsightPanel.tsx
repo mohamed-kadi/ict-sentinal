@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import { useShallow } from 'zustand/react/shallow';
 import { TradePanel } from './TradePanel';
 import { SymbolLogo } from './SymbolLogo';
+import { SidebarToggleButton } from './SidebarToggleButton';
 import { type AlertRelayEvent, useAppStore } from '@/state/useAppStore';
 import { formatWithTz, getClockLabel } from '@/lib/time';
 import { IctScannerResult, evaluateIctScanner } from '@/lib/ictScanner';
@@ -67,7 +68,7 @@ export function InsightPanel({
   latestSignalTime = null,
   actionableSignalTime = null,
 }: Props) {
-  const { clockTz, alertStatus, alertRelayEvents, clearAlertRelayEvents, notificationsEnabled, autoTradeEnabled } =
+  const { clockTz, alertStatus, alertRelayEvents, clearAlertRelayEvents, notificationsEnabled, autoTradeEnabled, toggleInsight } =
     useAppStore(
       useShallow((state) => ({
         clockTz: state.clockTz,
@@ -76,6 +77,7 @@ export function InsightPanel({
         clearAlertRelayEvents: state.clearAlertRelayEvents,
         notificationsEnabled: state.notificationsEnabled,
         autoTradeEnabled: state.backtest.autoTrade,
+        toggleInsight: state.toggleInsight,
       })),
     );
   const clockLabel = getClockLabel(clockTz);
@@ -94,11 +96,19 @@ export function InsightPanel({
     selectedSetup === 'all' ? signals.slice(-5) : signals.filter((s) => matchesSelectedSetup(s.setup)).slice(-5);
 
   return (
-    <div className="flex h-full w-80 shrink-0 flex-col gap-4 overflow-y-auto border-l border-zinc-800 bg-zinc-950/60 p-4 text-sm text-zinc-200">
+    <div className="flex h-full w-72 xl:w-80 shrink-0 flex-col gap-3 overflow-y-auto border-l border-zinc-800 bg-zinc-950/60 p-4 text-sm text-zinc-200">
       {activeSignal && (
-        <details open className="rounded border border-emerald-500/30 bg-emerald-500/5">
-          <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase text-emerald-300">
-            Active Entry
+        <details open className="relative rounded border border-emerald-500/30 bg-emerald-500/5">
+          <SidebarToggleButton
+            open
+            side="right"
+            onClick={() => toggleInsight()}
+            ariaLabel="Hide right panel"
+            title="Hide right panel"
+            className="absolute right-2 top-1 z-10 h-9 w-9 shrink-0 text-zinc-400 hover:text-zinc-100"
+          />
+          <summary className="cursor-pointer px-3 py-2 pr-12 text-xs font-semibold uppercase text-emerald-300">
+            Current ICT Entry
           </summary>
           <div className="space-y-3 px-3 pb-3 pt-1">
             <div className="flex items-start justify-between gap-3">
@@ -167,8 +177,18 @@ export function InsightPanel({
           </div>
         </details>
       )}
-      <details open className="rounded border border-zinc-800 bg-zinc-900/70">
-        <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase text-zinc-400">
+      <details open className="relative rounded border border-zinc-800 bg-zinc-900/70">
+        {!activeSignal && (
+          <SidebarToggleButton
+            open
+            side="right"
+            onClick={() => toggleInsight()}
+            ariaLabel="Hide right panel"
+            title="Hide right panel"
+            className="absolute right-2 top-1 z-10 h-9 w-9 shrink-0 text-zinc-400 hover:text-zinc-100"
+          />
+        )}
+        <summary className="cursor-pointer px-3 py-2 pr-12 text-xs font-semibold uppercase text-zinc-400">
           Asset
         </summary>
         <div className="px-3 pb-3 pt-1">
@@ -349,7 +369,7 @@ export function InsightPanel({
       {filteredSignals.length > 0 && (
         <details open className="rounded border border-zinc-800 bg-zinc-900/70">
           <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase text-zinc-400">
-            Latest setups
+            ICT Entries
           </summary>
           <div className="px-3 pb-3 pt-1 space-y-2">
             <div className="space-y-2">
@@ -377,10 +397,10 @@ export function InsightPanel({
       {filteredSignals.length === 0 && (
         <details open className="rounded border border-zinc-800 bg-zinc-900/70">
           <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase text-zinc-400">
-            Latest setups
+            ICT Entries
           </summary>
           <div className="px-3 pb-3 pt-2 text-[11px] text-zinc-400">
-            No signals for this setup/timeframe yet.
+            No qualified ICT entries for this setup and timeframe yet.
           </div>
         </details>
       )}

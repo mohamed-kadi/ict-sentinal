@@ -31,6 +31,16 @@ public class TradeJournalController {
     return tradeJournalService.recordTrade(request);
   }
 
+  @GetMapping
+  public TradeJournalEntriesResponse getTrades(
+    @RequestParam(required = false) String symbol,
+    @RequestParam(required = false) String timeframe,
+    @RequestParam(required = false) @Min(1) @Max(3650) Integer lookbackDays,
+    @RequestParam(required = false) @Min(1) @Max(200) Integer limit
+  ) {
+    return tradeJournalService.getRecentTrades(symbol, timeframe, lookbackDays, limit);
+  }
+
   @GetMapping("/performance")
   public TradePerformanceResponse getPerformance(
     @RequestParam(required = false) String symbol,

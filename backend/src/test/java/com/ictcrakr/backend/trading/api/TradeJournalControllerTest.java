@@ -91,5 +91,20 @@ class TradeJournalControllerTest {
       .andExpect(jsonPath("$.setups['Bias + OB/FVG + Session'].losses").value(1))
       .andExpect(jsonPath("$.setups['Bias + OB/FVG + Session'].allowed").value(true))
       .andExpect(jsonPath("$.setups['Bias + OB/FVG + Session'].sizeMultiplier").value(1.0));
+
+    mockMvc.perform(
+        get("/api/v1/trades")
+          .param("symbol", "btcusdt")
+          .param("timeframe", "15m")
+          .param("limit", "1")
+      )
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.totalEntries").value(2))
+      .andExpect(jsonPath("$.entries.length()").value(1))
+      .andExpect(jsonPath("$.entries[0].symbol").value("BTCUSDT"))
+      .andExpect(jsonPath("$.entries[0].timeframe").value("15M"))
+      .andExpect(jsonPath("$.entries[0].session").value("London"))
+      .andExpect(jsonPath("$.entries[0].result").value("LOSS"))
+      .andExpect(jsonPath("$.entries[0].rMultiple").value(-1.00));
   }
 }

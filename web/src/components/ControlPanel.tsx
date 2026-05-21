@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from 'react';
 import { TIMEFRAMES } from '@/lib/config';
 import { useAppStore } from '@/state/useAppStore';
+import { SidebarToggleButton } from './SidebarToggleButton';
 
 const ADVANCED_SETUP_VALUES = new Set(['Silver Bullet', 'Turtle Soup']);
 const FALLBACK_SUPPORTED_SETUPS = [
@@ -68,22 +69,17 @@ export function ControlPanel({ supportedSetups = [] }: ControlPanelProps) {
 
   return (
     <div className="flex h-full w-80 flex-col gap-2.5 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950/90 p-3 text-sm text-zinc-200 shadow-2xl shadow-black/50">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-sm text-zinc-200">
-            ☰
-          </span>
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">Chart Layers</p>
-          </div>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">Chart Layers</p>
         </div>
-        <button
-          className="rounded px-2 py-1 text-xs text-zinc-300 transition hover:text-emerald-200"
+        <SidebarToggleButton
+          open
           onClick={() => toggleSidebar()}
-          aria-label="Close layers"
-        >
-          ✕
-        </button>
+          title="Hide layers"
+          ariaLabel="Hide layers"
+          className="h-9 w-9 shrink-0 text-zinc-400 hover:text-zinc-100"
+        />
       </div>
       <section>
         <div className="mb-2 flex items-center justify-between">
