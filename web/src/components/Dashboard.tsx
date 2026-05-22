@@ -12,6 +12,7 @@ import { useCandles } from '@/hooks/useCandles';
 import { evaluateIctScanner } from '@/lib/ictScanner';
 import { useSignalAnalysis } from '@/hooks/useSignalAnalysis';
 import { useBackendBaseUrl } from '@/lib/backend';
+import { getSignalActionability, timeframeToMs } from '@/lib/signalTiming';
 import { RuntimeStatusPanel, type RuntimeStatusItem } from './RuntimeStatusPanel';
 
 const EMPTY_CANDLES: Candle[] = [];
@@ -190,13 +191,18 @@ export function Dashboard() {
   const marketOpen = isMarketOpen(assetClass);
   const displayBias = scopedAnalysis?.bias ?? buildFallbackBias(analysisStatus);
   const latestSignalTime = notificationSignals.at(-1)?.time ?? null;
-  const latestSignalAnchorTime = latest?.t ?? latestSignalTime;
-  const actionableSignalTime =
-    latestSignalTime != null &&
-    latestSignalAnchorTime != null &&
-    latestSignalTime === latestSignalAnchorTime
-      ? latestSignalTime
-      : null;
+  const signalTimeframeMs = useMemo(() => timeframeToMs(timeframe), [timeframe]);
+  const latestSignalActionability = useMemo(
+    () =>
+      getSignalActionability({
+        signalTime: latestSignalTime,
+        candles: scopedCandles,
+        timeframeMs: signalTimeframeMs,
+        allowPreviousWhenLatestOpen: !backtest.enabled,
+      }),
+    [latestSignalTime, scopedCandles, signalTimeframeMs, backtest.enabled],
+  );
+  const actionableSignalTime = latestSignalActionability.actionableTime;
   const ictScanner = evaluateIctScanner({
     signal: notificationSignals.at(-1),
     bias: displayBias,
@@ -217,7 +223,9 @@ export function Dashboard() {
     setActiveSignalPromptScore(null);
     setTakeSignalPromptToken((value) => value + 1);
   }, []);
-  const dockedSidebarShellClass = insightOpen ? 'hidden 2xl:block 2xl:shrink-0' : 'hidden xl:block xl:shrink-0';
+  const dockedSidebarShellClass = insightOpen
+    ? 'relative z-20 hidden 2xl:block 2xl:shrink-0'
+    : 'relative z-20 hidden xl:block xl:shrink-0';
   const overlaySidebarClass = insightOpen ? '2xl:hidden' : 'xl:hidden';
 
   return (
@@ -260,7 +268,7 @@ export function Dashboard() {
             />
           </div>
         </div>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col">
           {isLoading && (
             <div className="flex flex-1 items-center justify-center text-sm text-zinc-400">
               Fetching {symbol} {timeframe} candles...
@@ -304,7 +312,7 @@ export function Dashboard() {
                 </div>
               )}
               <div className="flex min-h-0 min-w-0 flex-1">
-                <div className="min-h-0 min-w-0 flex-1">
+                <div className="relative z-0 min-h-0 min-w-0 flex-1">
                   <ChartPanel
                     leftPanelOpen={sidebarOpen}
                     rightPanelOpen={insightOpen}
@@ -544,29 +552,6 @@ function cleanStatusDetail(value?: string | null, maxLength = 180) {
 
 function uniqueSetups(setups: readonly string[]) {
   return Array.from(new Set(setups.filter(Boolean)));
-}
-
-function timeframeToMs(tf: Timeframe) {
-  switch (tf) {
-    case '1m':
-      return 60_000;
-    case '5m':
-      return 5 * 60_000;
-    case '15m':
-      return 15 * 60_000;
-    case '1h':
-      return 60 * 60_000;
-    case '4h':
-      return 4 * 60 * 60_000;
-    case '1D':
-      return 24 * 60 * 60_000;
-    case '1W':
-      return 7 * 24 * 60 * 60_000;
-    case '1M':
-      return 30 * 24 * 60 * 60_000;
-    default:
-      return 60 * 60_000;
-  }
 }
 
 function isMarketOpen(assetClass: AssetClass) {

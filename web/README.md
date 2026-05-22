@@ -91,6 +91,7 @@ This app is pinned to Node `22.21.1` in `web/.nvmrc` and `web/.node-version`. It
 - `npm run start`
 - `npm run lint`
 - `npm run typecheck`
+- `npm run check:relay`
 - `npm run analyze:sample`
 - `npm run capture:fixture -- --assetClass crypto --symbol BTCUSDT --timeframe 15m --limit 300`
 - `npm run debug:env`
@@ -99,6 +100,9 @@ all prepend that local Node binary automatically, so they do not depend on your 
 
 `npm run analyze:sample` posts the static regression fixture in `scripts/fixtures/backtest-sample.json` to the backend analysis API.
 `npm run capture:fixture` saves a fresh normalized market snapshot from the local Next.js API routes into `scripts/fixtures/`.
+`npm run check:relay` sends a sample `ict_alert` through the local `/api/alerts/relay` adapter and prints the delivery result from the configured downstream target.
+
+Use `npm run check:relay` only against a paper or test relay target. It sends a real alert payload.
 
 ## Verification
 
@@ -106,4 +110,5 @@ all prepend that local Node binary automatically, so they do not depend on your 
 cd web
 npm run lint
 npm run typecheck
+npm run check:relay
 ```

@@ -10,8 +10,9 @@
     "build": "./scripts/with-local-node.sh next build --webpack",
     "start": "./scripts/with-local-node.sh next start",
     "lint": "./scripts/with-local-node.sh eslint . --ext .js,.jsx,.ts,.tsx",
-    "typecheck": "./scripts/with-local-node.sh tsc --noEmit",
+    "typecheck": "./scripts/with-local-node.sh tsc --noEmit --incremental false",
     "analyze:sample": "./scripts/with-local-node.sh node ./scripts/check-sample-analysis.js",
+    "check:relay": "./scripts/with-local-node.sh node ./scripts/check-alert-relay.js",
     "capture:fixture": "./scripts/with-local-node.sh node ./scripts/capture-analysis-fixture.js",
     "debug:env": "./scripts/with-local-node.sh node ./scripts/print-env-debug.js"
   },

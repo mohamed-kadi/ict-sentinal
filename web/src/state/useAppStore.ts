@@ -15,6 +15,8 @@ type OverlayKey =
   | 'liquidity'
   | 'fvg'
   | 'orderBlocks'
+  | 'bullishOrderBlocks'
+  | 'bearishOrderBlocks'
   | 'sessions'
   | 'killzones'
   | 'signals'
@@ -134,30 +136,63 @@ type AppState = {
   updateTrade: (id: string, patch: Partial<BacktestTrade>) => void;
 };
 
+const DEFAULT_OVERLAYS: Record<OverlayKey, boolean> = {
+  liquidity: true,
+  fvg: true,
+  orderBlocks: true,
+  bullishOrderBlocks: true,
+  bearishOrderBlocks: true,
+  sessions: true,
+  killzones: false,
+  signals: true,
+  sweeps: true,
+  breakers: false,
+  oteBands: true,
+  pdZones: true,
+  inversionFvgSignals: true,
+  tradeMarkers: true,
+  structureSegments: true,
+  eqConnectors: true,
+};
+
+function normalizeOverlays(overlays?: Partial<Record<OverlayKey, boolean>>) {
+  return { ...DEFAULT_OVERLAYS, ...overlays };
+}
+
+const DEFAULT_BACKTEST: BacktestState = {
+  enabled: false,
+  playing: false,
+  speed: 1,
+  cursor: 0,
+  trades: [],
+  balance: 0,
+  autoTrade: false,
+};
+
+function normalizeBacktest(backtest?: Partial<BacktestState>) {
+  const speed =
+    typeof backtest?.speed === 'number' && Number.isFinite(backtest.speed) && backtest.speed > 0
+      ? backtest.speed
+      : DEFAULT_BACKTEST.speed;
+  return {
+    ...DEFAULT_BACKTEST,
+    speed,
+  };
+}
+
+function computeBacktestBalance(trades: BacktestTrade[]) {
+  return trades.reduce((sum, trade) => sum + (trade.pnl ?? 0), 0);
+}
+
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       assetClass: 'crypto',
       symbol: 'BTCUSDT',
       timeframe: '1h',
-      overlays: {
-        liquidity: true,
-        fvg: true,
-        orderBlocks: true,
-        sessions: true,
-        killzones: false,
-        signals: true,
-        sweeps: true,
-        breakers: false,
-        oteBands: true,
-        pdZones: true,
-        inversionFvgSignals: true,
-        tradeMarkers: true,
-        structureSegments: true,
-        eqConnectors: true,
-      },
+      overlays: DEFAULT_OVERLAYS,
       selectedSetup: 'all',
-      backtest: { enabled: false, playing: false, speed: 1, cursor: 0, trades: [], balance: 0, autoTrade: false },
+      backtest: DEFAULT_BACKTEST,
       sidebarOpen: true,
       insightOpen: true,
       infoOpen: false,
@@ -181,26 +216,33 @@ export const useAppStore = create<AppState>()(
           backtest: { ...state.backtest, ...patch },
         })),
       addTrade: (trade) =>
-        set((state) => ({
-          backtest: { ...state.backtest, trades: [...state.backtest.trades, trade] },
-        })),
+        set((state) => {
+          const trades = [...state.backtest.trades, trade];
+          return {
+            backtest: {
+              ...state.backtest,
+              trades,
+              balance: computeBacktestBalance(trades),
+            },
+          };
+        }),
       clearTrades: () =>
         set((state) => ({
           backtest: { ...state.backtest, trades: [], balance: 0 },
         })),
       updateTrade: (id, patch) =>
-        set((state) => ({
-          backtest: {
-            ...state.backtest,
-            trades: state.backtest.trades.map((trade) =>
-              trade.id === id ? { ...trade, ...patch } : trade,
-            ),
-            balance:
-              patch.pnl != null
-                ? state.backtest.balance + patch.pnl
-                : state.backtest.balance,
-          },
-        })),
+        set((state) => {
+          const trades = state.backtest.trades.map((trade) =>
+            trade.id === id ? { ...trade, ...patch } : trade,
+          );
+          return {
+            backtest: {
+              ...state.backtest,
+              trades,
+              balance: computeBacktestBalance(trades),
+            },
+          };
+        }),
       setSelectedSetup: (selectedSetup) => set({ selectedSetup }),
       toggleSidebar: () =>
         set((state) => ({
@@ -223,10 +265,9 @@ export const useAppStore = create<AppState>()(
       setClockTz: (clockTz) => set({ clockTz }),
       setAllOverlays: (value) =>
         set((state) => ({
-          overlays: Object.fromEntries(Object.keys(state.overlays).map((key) => [key, value])) as Record<
-            OverlayKey,
-            boolean
-          >,
+          overlays: Object.fromEntries(
+            Object.keys(DEFAULT_OVERLAYS).map((key) => [key, value]),
+          ) as Record<OverlayKey, boolean>,
         })),
       toggleNotifications: () =>
         set((state) => ({
@@ -255,13 +296,24 @@ export const useAppStore = create<AppState>()(
     {
       name: 'ict-app-store',
       skipHydration: true,
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState as Partial<AppState> | undefined) ?? {};
+        return {
+          ...currentState,
+          ...persisted,
+          overlays: normalizeOverlays(persisted.overlays as Partial<Record<OverlayKey, boolean>> | undefined),
+          backtest: normalizeBacktest(persisted.backtest as Partial<BacktestState> | undefined),
+        };
+      },
       partialize: (state) => ({
         assetClass: state.assetClass,
         symbol: state.symbol,
         timeframe: state.timeframe,
         overlays: state.overlays,
         selectedSetup: state.selectedSetup,
-        backtest: state.backtest,
+        backtest: {
+          speed: state.backtest.speed,
+        },
         sidebarOpen: state.sidebarOpen,
         insightOpen: state.insightOpen,
         infoOpen: state.infoOpen,

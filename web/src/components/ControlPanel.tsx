@@ -21,6 +21,23 @@ const FALLBACK_SUPPORTED_SETUPS = [
   'Pullback Reentry',
 ] as const;
 const MODEL_2022_SETUP = 'Model 2022 M15 FVG';
+const OVERLAY_GRID_KEYS = [
+  'bullishOrderBlocks',
+  'bearishOrderBlocks',
+  'liquidity',
+  'fvg',
+  'sessions',
+  'killzones',
+  'signals',
+  'sweeps',
+  'breakers',
+  'oteBands',
+  'pdZones',
+  'inversionFvgSignals',
+  'tradeMarkers',
+  'structureSegments',
+  'eqConnectors',
+] as const;
 
 type ControlPanelProps = {
   supportedSetups?: string[];
@@ -60,6 +77,10 @@ export function ControlPanel({ supportedSetups = [] }: ControlPanelProps) {
     () => new Set(['all', 'advanced', MODEL_2022_SETUP, ...resolvedSupportedSetups]),
     [resolvedSupportedSetups],
   );
+  const overlayEntries = useMemo(
+    () => OVERLAY_GRID_KEYS.map((key) => [key, overlays[key]] as const),
+    [overlays],
+  );
 
   useEffect(() => {
     if (!validSelections.has(selectedSetup)) {
@@ -68,7 +89,7 @@ export function ControlPanel({ supportedSetups = [] }: ControlPanelProps) {
   }, [selectedSetup, setSelectedSetup, validSelections]);
 
   return (
-    <div className="flex h-full w-80 flex-col gap-2.5 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950/90 p-3 text-sm text-zinc-200 shadow-2xl shadow-black/50">
+    <div className="flex h-full w-80 flex-col gap-2 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950/90 px-2.5 py-2 text-sm text-zinc-200 shadow-2xl shadow-black/50">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">Chart Layers</p>
@@ -191,56 +212,41 @@ export function ControlPanel({ supportedSetups = [] }: ControlPanelProps) {
           </div>
         </div>
         <div className="grid grid-cols-3 gap-1.5">
-          {Object.entries(overlays).map(([key, value]) => (
+          {overlayEntries.map(([key, value]) => (
             <button
               key={key}
               type="button"
               aria-pressed={value}
-              className={[
-                'flex min-h-14 flex-col items-start justify-between rounded-lg border px-2 py-1.5 text-left text-[10px] transition',
-                value
-                  ? 'border-emerald-500/35 bg-emerald-500/8 text-emerald-100'
-                  : 'border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700',
-              ].join(' ')}
-              onClick={() => toggleOverlay(key as any)}
+              className={overlayChipClass(key, value)}
+              onClick={() => toggleOverlay(key)}
             >
               <span className="line-clamp-2 leading-tight">{labelFor(key)}</span>
-              <span
-                className={[
-                  'rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
-                  value ? 'bg-emerald-500/15 text-emerald-200' : 'bg-zinc-800 text-zinc-500',
-                ].join(' ')}
-              >
+              <span className={overlayChipBadgeClass(key, value)}>
                 {value ? 'On' : 'Off'}
               </span>
             </button>
           ))}
         </div>
-        <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">
-          <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wide text-zinc-500">
+        <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/70 p-2.5">
+          <div className="mb-2 flex items-center justify-between gap-2 text-[11px] uppercase tracking-wide text-zinc-500">
             <span>Replay</span>
-            <span
-              className={[
-                'rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
-                backtest.enabled ? 'bg-emerald-500/15 text-emerald-200' : 'bg-zinc-800 text-zinc-500',
-              ].join(' ')}
-            >
-              {backtest.enabled ? 'On' : 'Off'}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              className={controlBtn(backtest.enabled)}
+              aria-pressed={backtest.enabled}
+              className={togglePill(backtest.enabled)}
               onClick={() =>
                 setBacktest({
                   enabled: !backtest.enabled,
                   playing: false,
                 })
               }
+              title={backtest.enabled ? 'Turn replay off' : 'Turn replay on'}
             >
-              {backtest.enabled ? 'Disable' : 'Enable'}
+              <span>{backtest.enabled ? 'On' : 'Off'}</span>
+              <span className={toggleKnob(backtest.enabled)} />
             </button>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
             <button
               type="button"
               className={controlBtn(false)}
@@ -260,19 +266,6 @@ export function ControlPanel({ supportedSetups = [] }: ControlPanelProps) {
             >
               {backtest.playing ? 'Pause' : 'Play'}
             </button>
-            <div className="flex items-center justify-end gap-1">
-              {[0.5, 1, 2, 5].map((speed) => (
-                <button
-                  key={speed}
-                  type="button"
-                  className={speedChip(backtest.speed === speed)}
-                  onClick={() => setBacktest({ speed })}
-                  disabled={!backtest.enabled}
-                >
-                  {speed}x
-                </button>
-              ))}
-            </div>
             <button
               type="button"
               className={controlBtn(false)}
@@ -290,6 +283,22 @@ export function ControlPanel({ supportedSetups = [] }: ControlPanelProps) {
               Step +1
             </button>
           </div>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Speed</span>
+            <div className="flex flex-wrap items-center justify-end gap-1">
+              {[0.5, 1, 2, 5, 10].map((speed) => (
+                <button
+                  key={speed}
+                  type="button"
+                  className={speedChip(backtest.speed === speed)}
+                  onClick={() => setBacktest({ speed })}
+                  disabled={!backtest.enabled}
+                >
+                  {speed}x
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -298,7 +307,7 @@ export function ControlPanel({ supportedSetups = [] }: ControlPanelProps) {
 
 function controlBtn(active: boolean) {
   return [
-    'rounded border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-50',
+    'rounded border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-50',
     active
       ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-200'
       : 'border-zinc-800 bg-zinc-950 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100',
@@ -307,10 +316,58 @@ function controlBtn(active: boolean) {
 
 function speedChip(active: boolean) {
   return [
-    'rounded border px-1.5 py-1 text-[9px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
+    'rounded border px-1.5 py-0.5 text-[9px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
     active
       ? 'border-sky-500/60 bg-sky-500/10 text-sky-200'
       : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200',
+  ].join(' ');
+}
+
+function overlayChipClass(
+  key: (typeof OVERLAY_GRID_KEYS)[number],
+  active: boolean,
+) {
+  const activeClass =
+    key === 'bearishOrderBlocks'
+      ? 'border-rose-500/35 bg-rose-500/8 text-rose-100'
+      : key === 'bullishOrderBlocks'
+        ? 'border-emerald-500/35 bg-emerald-500/8 text-emerald-100'
+        : 'border-emerald-500/35 bg-emerald-500/8 text-emerald-100';
+  return [
+    'flex min-h-11 flex-col items-start justify-between rounded-lg border px-2 py-1 text-left text-[10px] transition',
+    active ? activeClass : 'border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-700',
+  ].join(' ');
+}
+
+function overlayChipBadgeClass(
+  key: (typeof OVERLAY_GRID_KEYS)[number],
+  active: boolean,
+) {
+  const activeClass =
+    key === 'bearishOrderBlocks'
+      ? 'bg-rose-500/15 text-rose-200'
+      : key === 'bullishOrderBlocks'
+        ? 'bg-emerald-500/15 text-emerald-200'
+        : 'bg-emerald-500/15 text-emerald-200';
+  return [
+    'rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
+    active ? activeClass : 'bg-zinc-800 text-zinc-500',
+  ].join(' ');
+}
+
+function togglePill(active: boolean) {
+  return [
+    'inline-flex items-center gap-1 rounded-full border px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide transition',
+    active
+      ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-200'
+      : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200',
+  ].join(' ');
+}
+
+function toggleKnob(active: boolean) {
+  return [
+    'h-3 w-3 rounded-full transition',
+    active ? 'bg-emerald-300 shadow-[0_0_0_2px_rgba(16,185,129,0.18)]' : 'bg-zinc-600',
   ].join(' ');
 }
 
@@ -322,6 +379,10 @@ function labelFor(key: string) {
       return 'FVG';
     case 'orderBlocks':
       return 'Order Blocks';
+    case 'bullishOrderBlocks':
+      return 'Bullish OB';
+    case 'bearishOrderBlocks':
+      return 'Bearish OB';
     case 'sessions':
       return 'Sessions';
     case 'killzones':

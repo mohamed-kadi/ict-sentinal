@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { Signal, Bias, Timeframe } from '@/lib/types';
 
 export type AlertConnectorContext = {
@@ -49,6 +50,12 @@ export type AlertRelayResult = {
   lastResponse: AlertRelayResponseSnapshot | null;
 };
 
+export type AlertRelayStatusSnapshot = {
+  configured: boolean;
+  channel: AlertRelayChannel | null;
+  label: string;
+};
+
 const publicRelayMode = normalizeRelayMode(process.env.NEXT_PUBLIC_ALERT_RELAY_MODE);
 const publicExecutionUrl = process.env.NEXT_PUBLIC_ALERT_EXECUTION_URL?.trim() || null;
 const publicWebhookUrl = process.env.NEXT_PUBLIC_ALERT_WEBHOOK?.trim() || null;
@@ -59,13 +66,42 @@ export const alertRelayConfigured = Boolean(alertRelayMode);
 export const alertRelayLabel =
   alertRelayMode === 'execution' ? 'Execution' : alertRelayMode === 'webhook' ? 'Webhook' : 'Local only';
 
+const staticAlertRelayStatus: AlertRelayStatusSnapshot = {
+  configured: alertRelayConfigured,
+  channel: alertRelayMode,
+  label: alertRelayLabel,
+};
+
+let cachedAlertRelayStatus = staticAlertRelayStatus;
+let relayStatusFetchStarted = false;
+const relayStatusListeners = new Set<(status: AlertRelayStatusSnapshot) => void>();
+
+export function useAlertRelayStatus() {
+  const [status, setStatus] = useState(cachedAlertRelayStatus);
+
+  useEffect(() => {
+    relayStatusListeners.add(setStatus);
+
+    if (!relayStatusFetchStarted) {
+      relayStatusFetchStarted = true;
+      void refreshAlertRelayStatus();
+    }
+
+    return () => {
+      relayStatusListeners.delete(setStatus);
+    };
+  }, []);
+
+  return status;
+}
+
 export async function notifyAlertConnectors(
   signal: Signal,
   context: AlertConnectorContext,
 ): Promise<AlertRelayResult> {
   if (typeof window === 'undefined') {
     return {
-      channel: alertRelayMode ?? 'webhook',
+      channel: fallbackRelayChannel(),
       deliveryStatus: 'skipped',
       ackStatus: 'missing',
       acceptanceStatus: 'unknown',
@@ -104,7 +140,7 @@ export async function notifyAlertConnectors(
       return parsed;
     }
     return {
-      channel: alertRelayMode ?? 'webhook',
+      channel: fallbackRelayChannel(),
       deliveryStatus: response.ok ? 'delivered' : 'failed',
       ackStatus: response.ok ? 'acknowledged' : 'missing',
       acceptanceStatus: response.ok ? 'unknown' : 'rejected',
@@ -120,7 +156,7 @@ export async function notifyAlertConnectors(
   } catch (err) {
     console.warn('[ICT] alert webhook failed', err);
     return {
-      channel: alertRelayMode ?? 'webhook',
+      channel: fallbackRelayChannel(),
       deliveryStatus: 'failed',
       ackStatus: 'missing',
       acceptanceStatus: 'unknown',
@@ -153,4 +189,38 @@ function isAlertRelayResult(value: unknown): value is AlertRelayResult {
       candidate.acceptanceStatus === 'unknown') &&
     typeof candidate.detail === 'string'
   );
+}
+
+function isAlertRelayStatusSnapshot(value: unknown): value is AlertRelayStatusSnapshot {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<AlertRelayStatusSnapshot>;
+  return (
+    typeof candidate.configured === 'boolean' &&
+    (candidate.channel === 'execution' || candidate.channel === 'webhook' || candidate.channel === null) &&
+    typeof candidate.label === 'string'
+  );
+}
+
+async function refreshAlertRelayStatus() {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const response = await fetch('/api/alerts/relay', {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    const parsed = (await response.json().catch(() => null)) as unknown;
+    if (!response.ok || !isAlertRelayStatusSnapshot(parsed)) {
+      return;
+    }
+
+    cachedAlertRelayStatus = parsed;
+    relayStatusListeners.forEach((listener) => listener(cachedAlertRelayStatus));
+  } catch {
+    // keep static fallback when runtime probe is unavailable
+  }
+}
+
+function fallbackRelayChannel(): AlertRelayChannel {
+  return cachedAlertRelayStatus.channel ?? alertRelayMode ?? 'webhook';
 }

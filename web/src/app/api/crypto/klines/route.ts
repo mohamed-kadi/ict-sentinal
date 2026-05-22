@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clamp } from '@/lib/utils';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const INTERVAL_MAP: Record<string, string> = {
   '1m': '1m',
   '5m': '5m',
@@ -33,7 +36,7 @@ export async function GET(request: NextRequest) {
   if (endTime) url.searchParams.set('endTime', endTime);
 
   try {
-    const res = await fetch(url, { next: { revalidate: 5 } });
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) {
       return NextResponse.json({ error: 'Binance API error', status: res.status }, { status: 502 });
     }
@@ -46,7 +49,7 @@ export async function GET(request: NextRequest) {
       c: Number(candle[4]),
       v: Number(candle[5]),
     }));
-    return NextResponse.json({ symbol, interval, candles, timezone: 'UTC' });
+    return NextResponse.json({ symbol, interval, candles, timezone: 'UTC', source: 'binance' });
   } catch (error) {
     return NextResponse.json(
       { error: 'Failed to reach Binance', detail: String(error) },

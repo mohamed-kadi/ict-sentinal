@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['lightweight-charts'],
+  devIndicators: false,
   images: {
     remotePatterns: [
       {

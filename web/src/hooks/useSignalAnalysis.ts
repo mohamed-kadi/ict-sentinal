@@ -22,6 +22,11 @@ export function useSignalAnalysis(
       candles.length,
       first?.t ?? null,
       last?.t ?? null,
+      last?.o ?? null,
+      last?.h ?? null,
+      last?.l ?? null,
+      last?.c ?? null,
+      last?.v ?? null,
     ];
   }, [candles]);
 

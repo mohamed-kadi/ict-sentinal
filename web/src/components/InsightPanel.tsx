@@ -1,7 +1,7 @@
 'use client';
 
 import { AssetClass, Bias, Gap, OrderBlock, Signal, Swing, PremiumDiscountRange } from '@/lib/types';
-import { alertRelayConfigured, alertRelayLabel } from '@/lib/alertConnectors';
+import { useAlertRelayStatus } from '@/lib/alertConnectors';
 import clsx from 'clsx';
 import { useShallow } from 'zustand/react/shallow';
 import { TradePanel } from './TradePanel';
@@ -80,6 +80,7 @@ export function InsightPanel({
         toggleInsight: state.toggleInsight,
       })),
     );
+  const relayStatus = useAlertRelayStatus();
   const clockLabel = getClockLabel(clockTz);
   const lastRelayEvent =
     alertRelayEvents
@@ -94,9 +95,14 @@ export function InsightPanel({
   };
   const filteredSignals =
     selectedSetup === 'all' ? signals.slice(-5) : signals.filter((s) => matchesSelectedSetup(s.setup)).slice(-5);
+  const filteredLatestSignalTime = filteredSignals.at(-1)?.time ?? null;
+  const filteredActionableSignalTime =
+    filteredLatestSignalTime != null && actionableSignalTime != null && filteredLatestSignalTime === actionableSignalTime
+      ? filteredLatestSignalTime
+      : null;
 
   return (
-    <div className="flex h-full w-72 xl:w-80 shrink-0 flex-col gap-3 overflow-y-auto border-l border-zinc-800 bg-zinc-950/60 p-4 text-sm text-zinc-200">
+    <div className="flex h-full w-72 xl:w-80 shrink-0 flex-col gap-2 overflow-y-auto border-l border-zinc-800 bg-zinc-950/60 px-2.5 pb-2.5 pt-1.5 text-sm text-zinc-200">
       {activeSignal && (
         <details open className="relative rounded border border-emerald-500/30 bg-emerald-500/5">
           <SidebarToggleButton
@@ -107,15 +113,15 @@ export function InsightPanel({
             title="Hide right panel"
             className="absolute right-2 top-1 z-10 h-9 w-9 shrink-0 text-zinc-400 hover:text-zinc-100"
           />
-          <summary className="cursor-pointer px-3 py-2 pr-12 text-xs font-semibold uppercase text-emerald-300">
+          <summary className="cursor-pointer px-3 py-1.5 pr-12 text-xs font-semibold uppercase text-emerald-300">
             Current ICT Entry
           </summary>
-          <div className="space-y-3 px-3 pb-3 pt-1">
+          <div className="space-y-2.5 px-3 pb-2.5 pt-1">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
                   <span className={activeSignal.direction === 'buy' ? 'text-emerald-300' : 'text-red-300'}>
-                    {activeSignal.direction === 'buy' ? 'Buy' : 'Sell'}
+                    {activeSignal.direction === 'buy' ? 'Buy Entry' : 'Sell Entry'}
                   </span>
                   {activeSignal.setup && (
                     <span className="rounded bg-zinc-800 px-1 py-[1px] text-[10px] text-zinc-300">{activeSignal.setup}</span>
@@ -188,10 +194,10 @@ export function InsightPanel({
             className="absolute right-2 top-1 z-10 h-9 w-9 shrink-0 text-zinc-400 hover:text-zinc-100"
           />
         )}
-        <summary className="cursor-pointer px-3 py-2 pr-12 text-xs font-semibold uppercase text-zinc-400">
+        <summary className="cursor-pointer px-3 py-1.5 pr-12 text-xs font-semibold uppercase text-zinc-400">
           Asset
         </summary>
-        <div className="px-3 pb-3 pt-1">
+        <div className="px-3 pb-2.5 pt-1">
           <div className="flex items-center gap-2">
             {symbol && (
               <SymbolLogo symbol={symbol} size={32} className="h-8 w-8" />
@@ -232,24 +238,28 @@ export function InsightPanel({
       </details>
 
       <details open className="rounded border border-amber-500/25 bg-amber-500/5">
-        <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase text-amber-200">
+        <summary className="cursor-pointer px-3 py-1.5 text-xs font-semibold uppercase text-amber-200">
           Alert Pipeline
         </summary>
-        <div className="space-y-3 px-3 pb-3 pt-1">
+        <div className="space-y-2.5 px-3 pb-2.5 pt-1">
           <div className="grid grid-cols-2 gap-2 text-[11px]">
-            <PipelineStat label="Relay" value={alertRelayConfigured ? alertRelayLabel : 'Local only'} tone={alertRelayConfigured ? 'emerald' : 'amber'} />
+            <PipelineStat
+              label="Relay"
+              value={relayStatus.configured ? relayStatus.label : 'Local only'}
+              tone={relayStatus.configured ? 'emerald' : 'amber'}
+            />
             <PipelineStat label="Alerts" value={notificationsEnabled ? 'On' : 'Off'} tone={notificationsEnabled ? 'emerald' : 'zinc'} />
             <PipelineStat label="Auto Trade" value={autoTradeEnabled ? 'On' : 'Off'} tone={autoTradeEnabled ? 'emerald' : 'zinc'} />
             <PipelineStat
               label="Signal"
               value={
-                actionableSignalTime != null
-                  ? 'Actionable'
-                  : latestSignalTime != null
+                filteredActionableSignalTime != null
+                  ? 'Entry Now'
+                  : filteredLatestSignalTime != null
                     ? 'Historical'
                     : 'None'
               }
-              tone={actionableSignalTime != null ? 'emerald' : latestSignalTime != null ? 'amber' : 'zinc'}
+              tone={filteredActionableSignalTime != null ? 'emerald' : filteredLatestSignalTime != null ? 'amber' : 'zinc'}
             />
             <PipelineStat
               label="Bot Ack"
@@ -299,10 +309,10 @@ export function InsightPanel({
       </details>
 
       <details open className="rounded border border-zinc-800 bg-zinc-900/70">
-        <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase text-zinc-400">
+        <summary className="cursor-pointer px-3 py-1.5 text-xs font-semibold uppercase text-zinc-400">
           Snapshot
         </summary>
-        <div className="px-3 pb-3 pt-1">
+        <div className="px-3 pb-2.5 pt-1">
           <h3 className="mb-3 text-xs uppercase text-zinc-500">Snapshot</h3>
           <ul className="space-y-2">
             <li className="flex items-center justify-between">
@@ -331,10 +341,10 @@ export function InsightPanel({
 
       {ictScanner && (
         <details open className="rounded border border-sky-500/30 bg-sky-500/5">
-          <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase text-sky-300">
+          <summary className="cursor-pointer px-3 py-1.5 text-xs font-semibold uppercase text-sky-300">
             ICT radar
           </summary>
-          <div className="px-3 pb-3 pt-1 space-y-3">
+          <div className="px-3 pb-2.5 pt-1 space-y-2.5">
             <div className="flex items-center justify-between gap-3">
               <span
                 className={`rounded px-2 py-1 text-xs font-semibold uppercase tracking-wide ${scannerLabelClass(
@@ -368,10 +378,10 @@ export function InsightPanel({
 
       {filteredSignals.length > 0 && (
         <details open className="rounded border border-zinc-800 bg-zinc-900/70">
-          <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase text-zinc-400">
+          <summary className="cursor-pointer px-3 py-1.5 text-xs font-semibold uppercase text-zinc-400">
             ICT Entries
           </summary>
-          <div className="px-3 pb-3 pt-1 space-y-2">
+          <div className="px-3 pb-2.5 pt-1 space-y-2">
             <div className="space-y-2">
               {filteredSignals
                 .slice()
@@ -386,8 +396,8 @@ export function InsightPanel({
                     latestPrice={latestPrice}
                     bias={bias}
                     premiumDiscount={premiumDiscount}
-                    latestSignalTime={latestSignalTime}
-                    actionableSignalTime={actionableSignalTime}
+                    latestSignalTime={filteredLatestSignalTime}
+                    actionableSignalTime={filteredActionableSignalTime}
                   />
                 ))}
             </div>
@@ -396,20 +406,20 @@ export function InsightPanel({
       )}
       {filteredSignals.length === 0 && (
         <details open className="rounded border border-zinc-800 bg-zinc-900/70">
-          <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase text-zinc-400">
+          <summary className="cursor-pointer px-3 py-1.5 text-xs font-semibold uppercase text-zinc-400">
             ICT Entries
           </summary>
-          <div className="px-3 pb-3 pt-2 text-[11px] text-zinc-400">
+          <div className="px-3 pb-2.5 pt-1.5 text-[11px] text-zinc-400">
             No qualified ICT entries for this setup and timeframe yet.
           </div>
         </details>
       )}
 
       <details open className="rounded border border-emerald-500/30 bg-emerald-500/5">
-        <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase text-emerald-300">
+        <summary className="cursor-pointer px-3 py-1.5 text-xs font-semibold uppercase text-emerald-300">
           Paper trades
         </summary>
-        <div className="px-3 pb-3 pt-1">
+        <div className="px-3 pb-2.5 pt-1">
           <TradePanel />
         </div>
       </details>
@@ -460,7 +470,7 @@ function SetupCard({
   const scoreClass = readiness.direction === 'sell' ? sellChipClass(true) : buyChipClass(true);
   const signalState =
     actionableSignalTime != null && signal.time === actionableSignalTime
-      ? { label: 'Actionable', className: 'bg-emerald-500/20 text-emerald-100 border border-emerald-400/50' }
+      ? { label: 'Entry Now', className: 'bg-emerald-500/20 text-emerald-100 border border-emerald-400/50' }
       : latestSignalTime != null && signal.time === latestSignalTime
         ? { label: 'Stale', className: 'bg-amber-500/20 text-amber-100 border border-amber-400/50' }
         : { label: 'Historical', className: 'bg-zinc-800 text-zinc-300 border border-zinc-700' };
@@ -469,7 +479,7 @@ function SetupCard({
       <div className="flex items-center justify-between text-xs">
         <div className="flex items-center gap-2">
           <span className={signal.direction === 'buy' ? 'text-emerald-400' : 'text-red-400'}>
-            {signal.direction === 'buy' ? 'Buy' : 'Sell'}
+            {signal.direction === 'buy' ? 'Buy Entry' : 'Sell Entry'}
           </span>
           {signal.setup && (
             <span className="rounded bg-zinc-800 px-1 py-[1px] text-[10px] text-zinc-300">{signal.setup}</span>

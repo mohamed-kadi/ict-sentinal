@@ -173,7 +173,7 @@ export function TradePanel() {
   const journalRefreshing = Boolean(backendBaseUrl) && (performanceQuery.isFetching || journalEntriesQuery.isFetching);
 
   return (
-    <div className="mt-4 rounded border border-zinc-800 bg-zinc-900/70 p-4 text-sm text-zinc-200">
+    <div className="mt-3 rounded border border-zinc-800 bg-zinc-900/70 p-3 text-sm text-zinc-200">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs uppercase text-zinc-500">
         <div>
           <span className="text-emerald-300">Win {wins}</span>{' '}
@@ -245,6 +245,9 @@ export function TradePanel() {
       </form>
       {backtest.trades.length > 0 && (
         <div className="mt-3 space-y-2 text-xs">
+          <div className="text-[10px] uppercase tracking-wide text-zinc-500">
+            Recent 5 of {backtest.trades.length} backtest trades
+          </div>
           {backtest.trades.slice(-5).reverse().map((t) => (
             <div key={t.id} className="rounded border border-zinc-800 bg-zinc-950/70 p-2">
               <div className="flex items-center justify-between">

@@ -61,7 +61,7 @@ class SignalAnalysisServiceTest {
       price = close + 0.05;
     }
 
-    for (int i = 24; i < 27; i++) {
+    for (int i = 24; i < 26; i++) {
       double open = price;
       double close = open + 0.40;
       double high = close + 0.18;
@@ -70,11 +70,16 @@ class SignalAnalysisServiceTest {
       price = close + 0.04;
     }
 
-    SignalAnalysisCandleRequest previous = candles.get(candles.size() - 1);
-    double finalOpen = price + 0.05;
-    double finalLow = previous.l() - 0.35;
-    double finalClose = finalOpen + 0.55;
-    double finalHigh = finalClose + 0.10;
+    double pullbackOpen = price + 0.25;
+    double pullbackClose = pullbackOpen - 0.52;
+    double pullbackHigh = pullbackOpen + 0.08;
+    double pullbackLow = pullbackClose - 0.18;
+    candles.add(candle(start + 26 * 3_600_000L, pullbackOpen, pullbackHigh, pullbackLow, pullbackClose));
+
+    double finalOpen = pullbackClose + 0.02;
+    double finalLow = pullbackLow - 0.34;
+    double finalClose = pullbackOpen + 0.12;
+    double finalHigh = finalClose + 0.12;
     candles.add(candle(start + 27 * 3_600_000L, finalOpen, finalHigh, finalLow, finalClose));
 
     SignalAnalysisResponse response = service.analyze(new SignalAnalysisRequest(
@@ -92,6 +97,40 @@ class SignalAnalysisServiceTest {
         assertThat(signal.direction()).isEqualTo("buy");
         assertThat(signal.bias()).isEqualTo("Bullish");
       });
+  }
+
+  @Test
+  void doesNotEmitPullbackReentryForSameTrendWickOnlyContinuation() {
+    List<SignalAnalysisCandleRequest> candles = new ArrayList<>();
+    long start = 1_715_299_200_000L;
+    double price = 100.0;
+
+    for (int i = 0; i < 27; i++) {
+      double open = price;
+      double close = open + 0.42;
+      double high = close + 0.18;
+      double low = open - 0.14;
+      candles.add(candle(start + i * 3_600_000L, open, high, low, close));
+      price = close + 0.05;
+    }
+
+    SignalAnalysisCandleRequest previous = candles.get(candles.size() - 1);
+    double finalOpen = previous.c() - 0.08;
+    double finalClose = previous.c() + 0.22;
+    double finalHigh = finalClose + 0.12;
+    double finalLow = previous.l() - 0.10;
+    candles.add(candle(start + 27 * 3_600_000L, finalOpen, finalHigh, finalLow, finalClose));
+
+    SignalAnalysisResponse response = service.analyze(new SignalAnalysisRequest(
+      "BTCUSDT",
+      "1h",
+      candles,
+      50,
+      false
+    ));
+
+    assertThat(response.signals())
+      .noneSatisfy((signal) -> assertThat(signal.setup()).isEqualTo("Pullback Reentry"));
   }
 
   private SignalAnalysisCandleRequest candle(long time, double open, double high, double low, double close) {

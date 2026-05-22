@@ -22,6 +22,15 @@ type ParsedRelayBody = {
 
 type RelayAcceptanceStatus = AlertRelayResult['acceptanceStatus'];
 
+export async function GET() {
+  const target = resolveRelayTarget();
+  return NextResponse.json({
+    configured: Boolean(target),
+    channel: target?.channel ?? null,
+    label: target ? relayChannelLabel(target.channel) : 'Local only',
+  });
+}
+
 export async function POST(request: NextRequest) {
   const payload = await parsePayload(request);
   if (!payload) {
@@ -93,27 +102,33 @@ function buildRelayHeaders(token: string | null) {
 }
 
 function resolveRelayTarget(): RelayTarget | null {
+  const preferredChannel = resolveRelayMode();
   const executionUrl =
     process.env.ALERT_EXECUTION_URL?.trim() || process.env.NEXT_PUBLIC_ALERT_EXECUTION_URL?.trim() || null;
-  if (executionUrl) {
-    return {
-      channel: 'execution',
-      url: executionUrl,
-      token: process.env.ALERT_EXECUTION_TOKEN?.trim() || null,
-    };
-  }
-
   const webhookUrl =
     process.env.ALERT_WEBHOOK_URL?.trim() || process.env.NEXT_PUBLIC_ALERT_WEBHOOK?.trim() || null;
-  if (webhookUrl) {
-    return {
-      channel: 'webhook',
-      url: webhookUrl,
-      token: process.env.ALERT_WEBHOOK_TOKEN?.trim() || null,
-    };
-  }
+  const executionTarget = executionUrl
+    ? {
+        channel: 'execution' as const,
+        url: executionUrl,
+        token: process.env.ALERT_EXECUTION_TOKEN?.trim() || null,
+      }
+    : null;
+  const webhookTarget = webhookUrl
+    ? {
+        channel: 'webhook' as const,
+        url: webhookUrl,
+        token: process.env.ALERT_WEBHOOK_TOKEN?.trim() || null,
+      }
+    : null;
 
-  return null;
+  if (preferredChannel === 'execution') {
+    return executionTarget ?? webhookTarget;
+  }
+  if (preferredChannel === 'webhook') {
+    return webhookTarget ?? executionTarget;
+  }
+  return executionTarget ?? webhookTarget;
 }
 
 async function parsePayload(request: NextRequest): Promise<AlertRelayRequest | null> {
@@ -255,4 +270,16 @@ function buildPreview(value: string) {
 
 function buildResult(result: AlertRelayResult): AlertRelayResult {
   return result;
+}
+
+function resolveRelayMode(): AlertRelayChannel | null {
+  const value = process.env.ALERT_RELAY_MODE?.trim() || process.env.NEXT_PUBLIC_ALERT_RELAY_MODE?.trim() || null;
+  if (value === 'execution' || value === 'webhook') {
+    return value;
+  }
+  return null;
+}
+
+function relayChannelLabel(channel: AlertRelayChannel) {
+  return channel === 'execution' ? 'Execution' : 'Webhook';
 }

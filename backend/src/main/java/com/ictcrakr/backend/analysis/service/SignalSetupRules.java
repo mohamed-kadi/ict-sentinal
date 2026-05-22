@@ -72,6 +72,9 @@ final class SignalSetupRules {
     if (!input.sessionAllowed() || !input.killZoneContext() || input.shift() == null || input.sweep() == null) {
       return null;
     }
+    if (!input.shiftFollowsSweep() || input.shiftAgeBars() > 2 || input.sweepAgeBars() > 4) {
+      return null;
+    }
 
     CandleSnapshot candle = input.candle();
 
@@ -277,10 +280,10 @@ final class SignalSetupRules {
   record GapSnapshot(String type, double top, double bottom) {
   }
 
-  record ShiftSnapshot(String direction, String label) {
+  record ShiftSnapshot(long time, String direction, String label) {
   }
 
-  record SweepSnapshot(String direction, double price) {
+  record SweepSnapshot(long time, String direction, double price) {
   }
 
   record ChochFvgOteInput(
@@ -312,7 +315,10 @@ final class SignalSetupRules {
     boolean htfSellZone,
     String sessionLabel,
     ShiftSnapshot shift,
-    SweepSnapshot sweep
+    SweepSnapshot sweep,
+    int shiftAgeBars,
+    int sweepAgeBars,
+    boolean shiftFollowsSweep
   ) {
   }
 

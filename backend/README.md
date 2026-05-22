@@ -14,7 +14,7 @@ This service receives candle data from the Next.js client, calculates the tradin
 - `GET /api/v1/trades/performance`
   Aggregates journal performance by setup and returns `allowed` and `sizeMultiplier` fields used by the signal optimizer.
 - Flyway manages the `trade_journal_entries` schema.
-- JPA persists to an H2 file database by default and can be switched to PostgreSQL through environment variables.
+- Runtime persistence defaults to a local H2 file database, with PostgreSQL available as an override. Tests use in-memory H2.
 
 ## Runtime role in the project
 1. The frontend fetches raw candles through its own market-data proxy routes.
@@ -32,13 +32,26 @@ export ICTCRAKR_FRONTEND_ORIGIN=http://localhost:3000
 mvn spring-boot:run
 ```
 
+Safer local startup when an old backend may still be hanging onto port `8080` or the H2 file:
+
+```bash
+cd backend
+./scripts/run-local.sh
+```
+
+If the script reports a stale backend, replace it in one step:
+
+```bash
+cd backend
+./scripts/run-local.sh --replace
+```
+
 Default local settings:
 - Port: `8080`
-- Database: `jdbc:h2:file:./data/ictcrakr`
-- H2 console: `http://localhost:8080/h2-console`
+- Database: local H2 file at `backend/data/ictcrakr`
 - Allowed frontend origin: `http://localhost:3000`
 
-Optional PostgreSQL startup:
+Optional PostgreSQL override:
 
 ```bash
 cd backend

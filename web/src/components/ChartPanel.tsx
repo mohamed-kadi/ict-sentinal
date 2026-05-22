@@ -32,7 +32,8 @@ import {
 } from "@/lib/types";
 import { SESSION_ZONES } from "@/lib/config";
 import { classifySession } from "@/lib/sessions";
-import { alertRelayConfigured, alertRelayLabel, notifyAlertConnectors } from "@/lib/alertConnectors";
+import { notifyAlertConnectors, useAlertRelayStatus } from "@/lib/alertConnectors";
+import { getSignalActionability, timeframeToMs } from "@/lib/signalTiming";
 import { CLOCK_OPTIONS, formatWithTz, getClockLabel } from "@/lib/time";
 import { evaluateIctScanner } from "@/lib/ictScanner";
 import { postTradeJournalEntry, tradeJournalScopeQueryKey } from "@/lib/tradePerformance";
@@ -76,29 +77,6 @@ const DRAWING_TOOLBAR_TOOLS = [
   { mode: "short" as const, label: "Short", shortLabel: "Short", title: "Short position" },
 ];
 
-function timeframeToMs(tf?: Timeframe) {
-  switch (tf) {
-    case "1m":
-      return 60_000;
-    case "5m":
-      return 5 * 60_000;
-    case "15m":
-      return 15 * 60_000;
-    case "1h":
-      return 60 * 60_000;
-    case "4h":
-      return 4 * 60 * 60_000;
-    case "1D":
-      return 24 * 60 * 60_000;
-    case "1W":
-      return 7 * 24 * 60 * 60_000;
-    case "1M":
-      return 30 * 24 * 60 * 60_000;
-    default:
-      return 60 * 60_000;
-  }
-}
-
 type Props = {
   symbol?: string;
   timeframe?: Timeframe;
@@ -134,6 +112,8 @@ type Props = {
     | "liquidity"
     | "fvg"
     | "orderBlocks"
+    | "bullishOrderBlocks"
+    | "bearishOrderBlocks"
     | "sessions"
     | "killzones"
     | "signals"
@@ -242,6 +222,7 @@ export function ChartPanel({
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<UTCTimestamp> | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
   const [chartHeight, setChartHeight] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState(0);
   const [markersPluginReady, setMarkersPluginReady] = useState(0);
   const {
     drawingMode,
@@ -322,15 +303,42 @@ export function ChartPanel({
   const [isPanning, setIsPanning] = useState(false);
   const [signalPrompt, setSignalPrompt] = useState<Signal | null>(null);
   const [signalPromptScore, setSignalPromptScore] = useState<number | null>(null);
-  const lastPromptedSignalRef = useRef<number | null>(null);
+  const lastLivePromptedSignalRef = useRef<number | null>(null);
+  const lastBacktestPromptedSignalRef = useRef<number | null>(null);
   const dismissSignalPromptTokenRef = useRef(dismissSignalPromptToken ?? 0);
   const takeSignalPromptTokenRef = useRef(takeSignalPromptToken ?? 0);
   const viewportSyncFrameRef = useRef<number | null>(null);
   const viewportSyncUntilRef = useRef(0);
+  const lastReplayCursorRef = useRef<number | null>(backtest?.enabled ? backtest.cursor : null);
+  const relayStatus = useAlertRelayStatus();
+  const alertRelayConfigured = relayStatus.configured;
+  const alertRelayLabel = relayStatus.label;
+  const leftSidebarRailWidth =
+    leftPanelOpen && viewportWidth >= (rightPanelOpen ? 1536 : 1280) ? 320 : 0;
+  const footerRailStyle =
+    leftSidebarRailWidth > 0
+      ? {
+          marginLeft: `${-leftSidebarRailWidth}px`,
+          width: `calc(100% + ${leftSidebarRailWidth}px)`,
+        }
+      : undefined;
+  const matchesSelectedSetup = useCallback(
+    (setup?: string) => {
+      if (!setup) return false;
+      if (selectedSetup === "all") return true;
+      if (selectedSetup === "advanced") return ADVANCED_SETUPS.has(setup);
+      return setup === selectedSetup;
+    },
+    [selectedSetup],
+  );
   const promptSignalSource = backtest?.enabled
     ? notificationSignals ?? signals
     : backtestSignals ?? notificationSignals ?? signals;
-  const promptSignals = useMemo(() => promptSignalSource ?? [], [promptSignalSource]);
+  const promptSignals = useMemo(
+    () => (promptSignalSource ?? []).filter((signal) => matchesSelectedSetup(signal.setup)),
+    [matchesSelectedSetup, promptSignalSource],
+  );
+  const promptLatestSignal = promptSignals.length ? promptSignals.at(-1)! : null;
   const [manualTradePrompt, setManualTradePrompt] = useState<{
     x: number;
     y: number;
@@ -347,10 +355,21 @@ export function ChartPanel({
         : notificationSignals ?? signals;
     return source ?? [];
   }, [backtest?.enabled, notificationSignals, signals]);
-  const chartTrades = useMemo(() => backtest?.trades ?? trades ?? [], [backtest?.trades, trades]);
-  const lastSignalFeed = backtestSignals ?? notificationSignals ?? signals;
-  const lastSignal =
-    lastSignalFeed && lastSignalFeed.length ? lastSignalFeed.at(-1)! : null;
+  const chartTrades = useMemo(() => {
+    const sourceTrades = backtest?.trades ?? trades ?? [];
+    const scopedTrades = sourceTrades.filter(
+      (trade) =>
+        (!trade.symbol || !symbol || trade.symbol === symbol) &&
+        (!trade.timeframe || !timeframe || trade.timeframe === timeframe),
+    );
+    if (backtest?.enabled) {
+      return scopedTrades;
+    }
+    return scopedTrades.filter((trade) => {
+      const status = trade.status ?? (trade.result ? "closed" : "active");
+      return trade.manual || status !== "closed";
+    });
+  }, [backtest?.enabled, backtest?.trades, trades, symbol, timeframe]);
   const backtestCandles = fullCandles && fullCandles.length ? fullCandles : candles;
   const datasetKey = `${symbol ?? "?"}-${timeframe ?? "?"}`;
   const signalStorageKey = useMemo(() => `ict:last-signal:${datasetKey}`, [datasetKey]);
@@ -366,13 +385,27 @@ export function ChartPanel({
     () => Math.max(timeframeMs * 2, 15 * 60_000),
     [timeframeMs],
   );
+  const latestPromptSignalActionability = useMemo(
+    () =>
+      getSignalActionability({
+        signalTime: promptLatestSignal?.time,
+        candles,
+        timeframeMs,
+        allowPreviousWhenLatestOpen: !backtest?.enabled,
+      }),
+    [promptLatestSignal?.time, candles, timeframeMs, backtest?.enabled],
+  );
   const retestWindowMs = useMemo(
     () => Math.max(timeframeMs, 60_000) * RETEST_WINDOW_BARS,
     [timeframeMs],
   );
   const persistLastPromptedSignal = useCallback(
     (timestamp: number | null) => {
-      lastPromptedSignalRef.current = timestamp;
+      if (backtest?.enabled) {
+        lastBacktestPromptedSignalRef.current = timestamp;
+        return;
+      }
+      lastLivePromptedSignalRef.current = timestamp;
       if (typeof window === "undefined" || timestamp == null || !Number.isFinite(timestamp)) return;
       try {
         window.localStorage.setItem(signalStorageKey, String(timestamp));
@@ -380,18 +413,9 @@ export function ChartPanel({
         // ignore persistence errors
       }
     },
-    [signalStorageKey],
+    [backtest?.enabled, signalStorageKey],
   );
   const atrSeries = useMemo(() => computeAtrSeries(candles, 14), [candles]);
-  const matchesSelectedSetup = useCallback(
-    (setup?: string) => {
-      if (!setup) return false;
-      if (selectedSetup === "all") return true;
-      if (selectedSetup === "advanced") return ADVANCED_SETUPS.has(setup);
-      return setup === selectedSetup;
-    },
-    [selectedSetup],
-  );
   const totalCandles = backtestTotal ?? candles.length;
   const backtestCurrent = backtest?.enabled ? Math.min(backtest.cursor + 1, Math.max(totalCandles, 1)) : null;
   const backtestProgress =
@@ -540,7 +564,6 @@ export function ChartPanel({
     setAutoRunning(true);
     let wins = 0;
     let losses = 0;
-    let balanceDelta = 0;
     let added = 0;
     for (const signal of relevantSignals) {
       const shouldWaitForRetestEntry = waitForRetest && supportsRetestEntry(signal);
@@ -599,10 +622,7 @@ export function ChartPanel({
       added++;
       if (trade.result === "win") wins++;
       if (trade.result === "loss") losses++;
-      balanceDelta += trade.pnl ?? 0;
     }
-    const newBalance = (backtest.balance ?? 0) + balanceDelta;
-    patchBacktest?.({ balance: newBalance });
     setAutoSummary({ trades: added, wins, losses });
     setAutoRunning(false);
   };
@@ -787,10 +807,11 @@ export function ChartPanel({
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem(signalStorageKey);
       const parsed = stored ? Number(stored) : null;
-      lastPromptedSignalRef.current = Number.isFinite(parsed) ? parsed : null;
+      lastLivePromptedSignalRef.current = Number.isFinite(parsed) ? parsed : null;
     } else {
-      lastPromptedSignalRef.current = null;
+      lastLivePromptedSignalRef.current = null;
     }
+    lastBacktestPromptedSignalRef.current = null;
     if (lastDatasetKeyRef.current !== datasetKey) {
       lastDatasetKeyRef.current = datasetKey;
       setSignalPrompt(null);
@@ -798,6 +819,21 @@ export function ChartPanel({
       seenSignalIdsRef.current.clear();
     }
   }, [datasetKey, signalStorageKey]);
+
+  useEffect(() => {
+    if (!backtest?.enabled) {
+      lastReplayCursorRef.current = null;
+      lastBacktestPromptedSignalRef.current = null;
+      return;
+    }
+    const previousCursor = lastReplayCursorRef.current;
+    if (previousCursor == null || backtest.cursor < previousCursor) {
+      lastBacktestPromptedSignalRef.current = null;
+      setSignalPrompt(null);
+      setSignalPromptScore(null);
+    }
+    lastReplayCursorRef.current = backtest.cursor;
+  }, [backtest?.enabled, backtest?.cursor]);
 
   useEffect(() => {
     onSignalPromptChange?.(signalPrompt, signalPromptScore);
@@ -851,23 +887,23 @@ export function ChartPanel({
       });
       return;
     }
-    const latestTime = candles.at(-1)?.t ?? null;
-    const lastSignalTime = lastSignal?.time ?? null;
+    const latestTime = latestPromptSignalActionability.latestCandleTime;
+    const lastSignalTime = promptLatestSignal?.time ?? null;
     if (!latestTime || !lastSignalTime) {
       setAlertStatus({
         status: "stale",
-        message: "Awaiting first actionable entry alert…",
+        message: "Awaiting first live entry…",
         since: Date.now(),
       });
       return;
     }
-    const signalIsCurrent = lastSignalTime === latestTime;
+    const signalIsActionable = latestPromptSignalActionability.actionable;
     const signalAgeMs = Math.max(0, latestTime - lastSignalTime);
-    if (!signalIsCurrent) {
+    if (!signalIsActionable) {
       setAlertStatus({
         status: "stale",
         message: "Latest signal is historical and no longer actionable.",
-        detail: "The bot only announces or auto-trades signals on the current candle. It does not enter retroactively on prior candles.",
+        detail: "The bot only announces or auto-trades the current entry window. Older chart signals remain visible for review, but are not entered retroactively.",
         since: lastSignalTime,
       });
     } else if (signalAgeMs > staleSignalThreshold) {
@@ -880,8 +916,14 @@ export function ChartPanel({
     } else {
       setAlertStatus({
         status: "live",
-        message: `${alertRelayConfigured ? `${alertRelayLabel} adapter live` : "Auto-trade relay live"} · latest signal is actionable`,
-        detail: "Only the newest fresh signal is relayed. Historical chart entries do not trigger the bot retroactively.",
+        message:
+          latestPromptSignalActionability.mode === "prior-closed-candle"
+            ? `${alertRelayConfigured ? `${alertRelayLabel} adapter live` : "Auto-trade relay live"} · latest confirmed entry is ready`
+            : `${alertRelayConfigured ? `${alertRelayLabel} adapter live` : "Auto-trade relay live"} · live entry ready`,
+        detail:
+          latestPromptSignalActionability.mode === "prior-closed-candle"
+            ? "The setup confirmed on the just-closed candle and is still actionable on the newly opened candle."
+            : "Only the newest fresh signal is relayed. Historical chart entries do not trigger the bot retroactively.",
         since: lastSignalTime,
       });
     }
@@ -889,8 +931,13 @@ export function ChartPanel({
     notificationsEnabled,
     backtest?.enabled,
     backtest?.autoTrade,
+    alertRelayConfigured,
+    alertRelayLabel,
     candles,
-    lastSignal?.time,
+    promptLatestSignal?.time,
+    latestPromptSignalActionability.actionable,
+    latestPromptSignalActionability.latestCandleTime,
+    latestPromptSignalActionability.mode,
     setAlertStatus,
     staleSignalThreshold,
   ]);
@@ -1480,22 +1527,23 @@ export function ChartPanel({
       rawAnchorX != null
         ? clamp(rawAnchorX, 10, Math.max(10, chartWidth - 140))
         : Math.max(10, chartWidth - 180);
-    const zoneLeft = clamp(anchorX + 12, 8, Math.max(8, chartWidth - 180));
-    const zoneWidth = Math.max(124, chartWidth - zoneLeft - 10);
+    const laneWidth = Math.min(118, Math.max(84, Math.round(chartWidth * 0.14)));
+    const zoneLeft = clamp(chartWidth - laneWidth - 10, 8, Math.max(8, chartWidth - laneWidth - 8));
+    const zoneWidth = laneWidth;
     const bullish = signalPrompt.direction === "buy";
     const accent = bullish ? "rgba(74,222,128,0.96)" : "rgba(251,146,60,0.96)";
     const accentBg = bullish ? "rgba(6,78,59,0.88)" : "rgba(124,45,18,0.88)";
     const stopBorder = "rgba(248,113,113,0.92)";
-    const stopFill = "rgba(248,113,113,0.18)";
-    const targetBorder = bullish ? "rgba(45,212,191,0.92)" : "rgba(250,204,21,0.92)";
-    const targetFill = bullish ? "rgba(16,185,129,0.18)" : "rgba(249,115,22,0.18)";
-    const headerLeft = clamp(anchorX + 14, 8, Math.max(8, chartWidth - 220));
+    const stopFill = "rgba(248,113,113,0.14)";
+    const targetBorder = "rgba(34,197,94,0.92)";
+    const targetFill = "rgba(34,197,94,0.14)";
+    const headerLeft = clamp(anchorX + 14, 8, Math.max(8, zoneLeft - 126));
     const headerTop = clamp(entryY - 52, 8, Math.max(8, chartHeight - 58));
     const rr =
       stopPrice != null && targetPrice != null
         ? calcRMultiple(signalPrompt.price, stopPrice, targetPrice, signalPrompt.direction)
         : null;
-    const title = `${bullish ? "Actionable Buy" : "Actionable Sell"}${
+    const title = `${bullish ? "BUY ENTRY NOW" : "SELL ENTRY NOW"}${
       signalPromptScore != null ? ` • ${signalPromptScore.toFixed(0)}%` : ""
     }`;
     const setupLabel = signalPrompt.setup ?? (bullish ? "Buy setup" : "Sell setup");
@@ -1513,14 +1561,19 @@ export function ChartPanel({
           style={{ top: entryY, borderColor: accent }}
         />
         <div
-          className="absolute right-2 z-[25] -translate-y-1/2 rounded px-2 py-1 text-[10px] font-semibold text-white shadow-lg"
+          className="absolute z-[25] -translate-y-1/2 rounded px-2 py-1 text-[10px] font-semibold text-white shadow-lg"
           style={{
+            left: zoneLeft,
+            width: zoneWidth,
             top: entryY,
             backgroundColor: accentBg,
             boxShadow: `0 10px 28px ${accentBg}`,
           }}
         >
-          Entry {formatPrice(signalPrompt.price)}
+          <div className="flex items-center justify-between gap-2">
+            <span>ENTRY</span>
+            <span>{formatPrice(signalPrompt.price)}</span>
+          </div>
         </div>
         {stopY != null && (
           <div
@@ -1534,7 +1587,7 @@ export function ChartPanel({
               borderColor: stopBorder,
             }}
           >
-            <div className="absolute left-2 top-1 rounded bg-black/45 px-1.5 py-0.5">
+            <div className="absolute left-1.5 top-1 rounded bg-black/55 px-1.5 py-0.5">
               SL {formatPrice(stopPrice!)}
             </div>
           </div>
@@ -1551,7 +1604,7 @@ export function ChartPanel({
               borderColor: targetBorder,
             }}
           >
-            <div className="absolute left-2 top-1 rounded bg-black/45 px-1.5 py-0.5">
+            <div className="absolute left-1.5 top-1 rounded bg-black/55 px-1.5 py-0.5">
               TP1 {formatPrice(targetPrice!)}
               {rr != null && Number.isFinite(rr) ? ` • ${rr.toFixed(2)}R` : ""}
             </div>
@@ -1928,6 +1981,14 @@ export function ChartPanel({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const syncViewportWidth = () => setViewportWidth(window.innerWidth);
+    syncViewportWidth();
+    window.addEventListener("resize", syncViewportWidth, { passive: true });
+    return () => window.removeEventListener("resize", syncViewportWidth);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     let firstFrame: number | null = null;
     let secondFrame: number | null = null;
     const syncLayout = () => {
@@ -2198,16 +2259,82 @@ export function ChartPanel({
         selectedSetup === "all"
           ? chartSignals
           : chartSignals.filter((s) => matchesSelectedSetup(s.setup));
+      const latestChartSignalTime = candles.at(-1)?.t ?? null;
       markers.push(
-        ...filteredSignals.map((s) => ({
-          time: (s.time / 1000) as UTCTimestamp,
-          position: s.direction === "buy" ? ("belowBar" as const) : ("aboveBar" as const),
-          color: s.direction === "buy" ? "#34d399" : "#f87171",
-          shape: s.direction === "buy" ? ("arrowUp" as const) : ("arrowDown" as const),
-          text: s.setup ? formatSetupShort(s.setup) : s.direction === "buy" ? "Buy" : "Sell",
-          id: `sig-${s.time}-${s.setup ?? s.direction}`,
-          size: 0.85,
-        })),
+        ...filteredSignals.map((s) => {
+          const isLiveEntry = latestChartSignalTime != null && s.time === latestChartSignalTime;
+          return {
+            time: (s.time / 1000) as UTCTimestamp,
+            position: s.direction === "buy" ? ("belowBar" as const) : ("aboveBar" as const),
+            color: s.direction === "buy" ? "#34d399" : "#f87171",
+            shape: s.direction === "buy" ? ("arrowUp" as const) : ("arrowDown" as const),
+            text: isLiveEntry
+              ? s.direction === "buy"
+                ? "BUY ENTRY"
+                : "SELL ENTRY"
+              : s.setup
+                ? formatSetupShort(s.setup)
+                : s.direction === "buy"
+                  ? "Buy"
+                  : "Sell",
+            id: `sig-${s.time}-${s.setup ?? s.direction}`,
+            size: isLiveEntry ? 1 : 0.85,
+          };
+        }),
+      );
+    }
+
+    if (overlays.tradeMarkers && chartTrades.length) {
+      markers.push(
+        ...chartTrades.slice(-40).flatMap((trade) => {
+          const entryTime = trade.openTime ?? trade.armedAt ?? null;
+          const result = trade.result ?? null;
+          const status = trade.status ?? (result ? "closed" : "active");
+          const directionIsBuy = trade.direction === "buy";
+          const entryMarker =
+            entryTime == null
+              ? []
+              : [
+                  {
+                    time: (entryTime / 1000) as UTCTimestamp,
+                    position: directionIsBuy ? ("belowBar" as const) : ("aboveBar" as const),
+                    color:
+                      status === "planned"
+                        ? "#facc15"
+                        : result === "loss"
+                          ? "#fb7185"
+                          : result === "win"
+                            ? "#22c55e"
+                            : "#38bdf8",
+                    shape: status === "planned" ? ("circle" as const) : ("square" as const),
+                    text:
+                      status === "planned"
+                        ? directionIsBuy
+                          ? "BUY WAIT"
+                          : "SELL WAIT"
+                        : directionIsBuy
+                          ? "BUY TAKEN"
+                          : "SELL TAKEN",
+                    id: `trade-entry-${trade.id}`,
+                    size: 0.9,
+                  },
+                ];
+          const exitMarker =
+            trade.exitTime == null || result == null
+              ? []
+              : [
+                  {
+                    time: (trade.exitTime / 1000) as UTCTimestamp,
+                    position: directionIsBuy ? ("aboveBar" as const) : ("belowBar" as const),
+                    color: result === "win" ? "#22c55e" : result === "loss" ? "#fb7185" : "#cbd5e1",
+                    shape: "circle" as const,
+                    text: result === "win" ? "WIN" : result === "loss" ? "LOSS" : "BE",
+                    id: `trade-exit-${trade.id}`,
+                    size: 0.8,
+                  },
+                ];
+          return [...entryMarker, ...exitMarker];
+        }),
       );
     }
 
@@ -2346,28 +2473,80 @@ export function ChartPanel({
     if (overlays.oteBands && premiumDiscount && chartWidth > 0 && chartHeight > 0) {
       const dealingRange = premiumDiscount.high - premiumDiscount.low;
       if (dealingRange > 0) {
-        const oteHigh = premiumDiscount.high - dealingRange * 0.62;
-        const oteLow = premiumDiscount.high - dealingRange * 0.705;
-        const yHigh = priceToY(oteHigh);
-        const yLow = priceToY(oteLow);
-        if (yHigh != null && yLow != null) {
-          const boxes: OverlayBox[] = [
-            {
-              id: "ote-band",
-              left: 0,
-              width: Math.max(10, chartWidth),
-              top: Math.min(yHigh, yLow),
-              height: Math.max(4, Math.abs(yHigh - yLow)),
-              color: "rgba(168,85,247,0.14)",
-              gradient: "linear-gradient(180deg, rgba(168,85,247,0.24) 0%, rgba(168,85,247,0.06) 100%)",
-              borderColor: "rgba(196,181,253,0.9)",
-              textColor: "#f3e8ff",
-              label: "OTE 62% - 70.5%",
-              showLabel: true,
-              guideColor: "rgba(196,181,253,0.45)",
-              midlineColor: "rgba(233,213,255,0.65)",
-            },
-          ];
+        const oteContext =
+          signalPrompt?.direction ??
+          (bias?.label === "Bullish" ? "buy" : bias?.label === "Bearish" ? "sell" : null);
+        const bullishOteHigh = premiumDiscount.high - dealingRange * 0.62;
+        const bullishOteLow = premiumDiscount.high - dealingRange * 0.705;
+        const bearishOteLow = premiumDiscount.low + dealingRange * 0.62;
+        const bearishOteHigh = premiumDiscount.low + dealingRange * 0.705;
+        const boxes: OverlayBox[] = [];
+        const pushOteBox = ({
+          id,
+          high,
+          low,
+          label,
+          active,
+          bull,
+        }: {
+          id: string;
+          high: number;
+          low: number;
+          label: string;
+          active: boolean;
+          bull: boolean;
+        }) => {
+          const yHigh = priceToY(high);
+          const yLow = priceToY(low);
+          if (yHigh == null || yLow == null) {
+            return;
+          }
+          boxes.push({
+            id,
+            left: 0,
+            width: Math.max(10, chartWidth),
+            top: Math.min(yHigh, yLow),
+            height: Math.max(4, Math.abs(yHigh - yLow)),
+            color: bull
+              ? active
+                ? "rgba(16,185,129,0.14)"
+                : "rgba(16,185,129,0.08)"
+              : active
+                ? "rgba(244,63,94,0.14)"
+                : "rgba(244,63,94,0.08)",
+            gradient: bull
+              ? active
+                ? "linear-gradient(180deg, rgba(16,185,129,0.22) 0%, rgba(16,185,129,0.04) 100%)"
+                : "linear-gradient(180deg, rgba(16,185,129,0.14) 0%, rgba(16,185,129,0.02) 100%)"
+              : active
+                ? "linear-gradient(180deg, rgba(244,63,94,0.22) 0%, rgba(244,63,94,0.04) 100%)"
+                : "linear-gradient(180deg, rgba(244,63,94,0.14) 0%, rgba(244,63,94,0.02) 100%)",
+            borderColor: bull ? "rgba(45,212,191,0.88)" : "rgba(251,113,133,0.88)",
+            textColor: bull ? "#ccfbf1" : "#ffe4e6",
+            label,
+            showLabel: true,
+            guideColor: bull ? "rgba(45,212,191,0.42)" : "rgba(251,113,133,0.42)",
+            midlineColor: bull ? "rgba(153,246,228,0.6)" : "rgba(254,205,211,0.6)",
+          });
+        };
+
+        pushOteBox({
+          id: "ote-bullish",
+          high: bullishOteHigh,
+          low: bullishOteLow,
+          label: "Bullish OTE",
+          active: oteContext !== "sell",
+          bull: true,
+        });
+        pushOteBox({
+          id: "ote-bearish",
+          high: bearishOteHigh,
+          low: bearishOteLow,
+          label: "Bearish OTE",
+          active: oteContext !== "buy",
+          bull: false,
+        });
+        if (boxes.length > 0) {
           setOteBoxes((prev) => (areOverlayBoxesEqual(prev, boxes) ? prev : boxes));
         } else {
           setOteBoxes((prev) => (prev.length ? [] : prev));
@@ -2420,9 +2599,12 @@ export function ChartPanel({
       setPdZones((prev) => (prev.length ? [] : prev));
     }
 
-    if (overlays.orderBlocks && orderBlocks && chartWidth > 0 && chartHeight > 0) {
+    if ((overlays.bullishOrderBlocks || overlays.bearishOrderBlocks) && orderBlocks && chartWidth > 0 && chartHeight > 0) {
       const boxes: typeof obBoxes = [];
       orderBlocks.slice(-8).forEach((b, idx) => {
+        if ((b.type === "bullish" && !overlays.bullishOrderBlocks) || (b.type === "bearish" && !overlays.bearishOrderBlocks)) {
+          return;
+        }
         const x1 = timeToX(b.startTime);
         const x2 = timeToX(b.endTime);
         const yTop = priceToY(b.high);
@@ -2586,11 +2768,13 @@ export function ChartPanel({
         selectedSetup === "all"
           ? chartSignals.slice(-12)
           : chartSignals.filter((s) => matchesSelectedSetup(s.setup)).slice(-12);
+      const latestChartSignalTime = candles.at(-1)?.t ?? null;
       filtered.forEach((s, idx) => {
         const x = timeToX(s.time);
         const y = priceToY(s.price);
         if (x == null || y == null) return;
-        const width = 118;
+        const isLiveEntry = latestChartSignalTime != null && s.time === latestChartSignalTime;
+        const width = isLiveEntry ? 164 : 118;
         const height = 22;
         const left = clamp(x - width / 2, 4, Math.max(4, (chartWidth || width) - width - 4));
         const bullish = s.direction === "buy";
@@ -2614,7 +2798,9 @@ export function ChartPanel({
           borderColor: border,
           gradient,
           textColor: "#f8fafc",
-          label: formatSetupShort(s.setup ?? (bullish ? "BUY" : "SELL")),
+          label: isLiveEntry
+            ? `${bullish ? "BUY ENTRY" : "SELL ENTRY"}${s.setup ? ` · ${formatSetupShort(s.setup)}` : ""}`
+            : formatSetupShort(s.setup ?? (bullish ? "BUY" : "SELL")),
         });
       });
       setSignalBoxes((prev) => (areOverlayBoxesEqual(prev, boxes) ? prev : boxes));
@@ -2624,7 +2810,8 @@ export function ChartPanel({
 
     if (overlays.tradeMarkers && chartTrades.length && chartWidth > 0 && chartHeight > 0) {
       const boxes: OverlayBox[] = [];
-      chartTrades.slice(-12).forEach((trade, idx) => {
+      const visibleTrades = backtest?.enabled ? chartTrades.slice(-24) : chartTrades.slice(-12);
+      visibleTrades.forEach((trade, idx) => {
         const anchorTime = trade.openTime ?? trade.exitTime ?? candles.at(-1)?.t;
         if (anchorTime == null) return;
         const x = timeToX(anchorTime);
@@ -2692,10 +2879,12 @@ export function ChartPanel({
     orderBlocks,
     breakerBlocks,
     overlays.fvg,
-    overlays.orderBlocks,
+    overlays.bullishOrderBlocks,
+    overlays.bearishOrderBlocks,
     overlays.breakers,
     overlays.oteBands,
     premiumDiscount,
+    bias?.label,
     model2022?.m15Signals,
     model2022?.obWithDisplacement,
     overlays.signals,
@@ -2708,6 +2897,7 @@ export function ChartPanel({
     overlays.inversionFvgSignals,
     chartSignals,
     chartTrades,
+    backtest?.enabled,
     selectedSetup,
     matchesSelectedSetup,
     chartWidth,
@@ -2716,6 +2906,7 @@ export function ChartPanel({
     sweeps,
     equalHighsLows,
     candles,
+    signalPrompt?.direction,
     viewportVersion,
   ]);
 
@@ -2838,7 +3029,7 @@ export function ChartPanel({
     obZonesRef.current = [];
 
     // order block price lines suppressed; boxes handle the visualization
-  }, [orderBlocks, overlays.orderBlocks]);
+  }, [orderBlocks, overlays.bullishOrderBlocks, overlays.bearishOrderBlocks]);
 
   useEffect(() => {
     if (promptSignals.length === 0) {
@@ -2847,13 +3038,15 @@ export function ChartPanel({
       return;
     }
     const latest = promptSignals.at(-1)!;
-    const latestTime = candles.at(-1)?.t ?? latest.time;
-    const isCurrent = latest.time === latestTime;
+    const latestTime = latestPromptSignalActionability.latestCandleTime ?? latest.time;
+    const isActionable = latestPromptSignalActionability.actionable;
     const signalAgeMs = latestTime ? Math.max(0, latestTime - latest.time) : 0;
     const signalIsFresh = signalAgeMs <= staleSignalThreshold;
-    const shouldAnnounceSignal = isCurrent && signalIsFresh;
-    const isNewSignal =
-      lastPromptedSignalRef.current == null || latest.time > lastPromptedSignalRef.current;
+    const shouldAnnounceSignal = isActionable && signalIsFresh;
+    const lastPromptedSignal = backtest?.enabled
+      ? lastBacktestPromptedSignalRef.current
+      : lastLivePromptedSignalRef.current;
+    const isNewSignal = lastPromptedSignal == null || latest.time > lastPromptedSignal;
     const showPrompt = () => {
       setSignalPrompt(latest);
       const evalResult = evaluateIctScanner({
@@ -2927,7 +3120,7 @@ export function ChartPanel({
         return;
       }
       showPrompt();
-    } else if (backtest?.enabled && isCurrent && signalPrompt && signalPrompt.time > latest.time) {
+    } else if (backtest?.enabled && isActionable && signalPrompt && signalPrompt.time > latest.time) {
       // If stepping backward to an earlier signal candle, restore that prompt.
       setSignalPrompt(latest);
       const evalResult = evaluateIctScanner({
@@ -2954,6 +3147,8 @@ export function ChartPanel({
     timeframe,
     dataSource,
     persistLastPromptedSignal,
+    latestPromptSignalActionability.actionable,
+    latestPromptSignalActionability.latestCandleTime,
     staleSignalThreshold,
   ]);
 
@@ -3390,7 +3585,7 @@ export function ChartPanel({
           <FvgOverlayLayer boxes={model2022Boxes} className="z-20" />
         )}
         {overlays.fvg && fvgBoxes.length > 0 && <FvgOverlayLayer boxes={fvgBoxes} className="z-10" />}
-        {overlays.orderBlocks && obBoxes.length > 0 && (
+        {(overlays.bullishOrderBlocks || overlays.bearishOrderBlocks) && obBoxes.length > 0 && (
           <div className="pointer-events-none absolute inset-0 z-10">
             {obBoxes.map((box) => (
               <div
@@ -3443,7 +3638,10 @@ export function ChartPanel({
           </div>
         )}
       </div>
-      <div className="relative flex h-12 shrink-0 items-center border-t border-white/10 bg-[#0f172a]/95 text-sm text-white shadow-[0_-1px_0_0_rgba(255,255,255,0.08)]">
+      <div
+        className="relative flex h-12 shrink-0 items-center border-t border-white/10 bg-[#0f172a]/95 text-sm text-white shadow-[0_-1px_0_0_rgba(255,255,255,0.08)]"
+        style={footerRailStyle}
+      >
         {backtest?.enabled && backtestTotal && (
           <div className="absolute inset-x-0 top-0 h-1 bg-zinc-800/70">
             <div
@@ -3451,6 +3649,13 @@ export function ChartPanel({
               style={{ width: `${Math.max(0, Math.min(1, backtestProgress ?? 0)) * 100}%` }}
             />
           </div>
+        )}
+        {leftSidebarRailWidth > 0 && (
+          <div
+            aria-hidden="true"
+            className="h-full shrink-0 border-r border-white/10 bg-[#0f172a]/95"
+            style={{ width: `${leftSidebarRailWidth}px` }}
+          />
         )}
         <div className="relative flex-1 h-full px-3">
           <div className="absolute left-3 top-1 text-[11px] text-gray-400">
@@ -3481,10 +3686,11 @@ export function ChartPanel({
                 backtest.autoTrade ? "border-emerald-500/60 text-emerald-200" : "border-zinc-600 text-zinc-300",
               )}
               onClick={() => patchBacktest?.({ autoTrade: !backtest.autoTrade })}
+              title="When ON, replay will enter trades only when Play or Step reaches a fresh signal candle."
             >
-              Auto trade: {backtest.autoTrade ? "ON" : "OFF"}
+              Replay auto-trade: {backtest.autoTrade ? "ON" : "OFF"}
             </button>
-              <span>Auto %</span>
+              <span title="Batch simulation range as a percentage of loaded history.">Range %</span>
               <input
                 type="number"
                 min={0}
@@ -3511,8 +3717,9 @@ export function ChartPanel({
                   className="rounded border border-emerald-400/60 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-50"
                   onClick={runAutoBacktest}
                   disabled={autoRunning}
+                  title="Runs a one-shot batch simulation over the selected history range. This is separate from replay auto-trade."
                 >
-                  {autoRunning ? "Running…" : "Auto trade"}
+                  {autoRunning ? "Running…" : "Run range sim"}
                 </button>
               )}
               {autoSummary && (
@@ -3521,6 +3728,13 @@ export function ChartPanel({
                 </span>
               )}
               {autoError && <span className="text-red-300">{autoError}</span>}
+              {backtest.autoTrade && !autoSummary && !autoError && (
+                <span className="text-zinc-400">
+                  {chartTrades.length > 0
+                    ? `${chartTrades.length} backtest trade${chartTrades.length === 1 ? "" : "s"} recorded.`
+                    : "Press Play or Step to let replay take trades on fresh signal candles."}
+                </span>
+              )}
             </div>
         )}
         <div className="flex items-center gap-2 px-3 text-right text-sm font-semibold text-white drop-shadow">

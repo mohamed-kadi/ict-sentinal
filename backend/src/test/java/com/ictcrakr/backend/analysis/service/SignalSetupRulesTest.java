@@ -19,7 +19,7 @@ class SignalSetupRulesTest {
         true,
         false,
         "New York AM",
-        new SignalSetupRules.ShiftSnapshot("bullish", "CHoCH"),
+        new SignalSetupRules.ShiftSnapshot(1_715_400_000_000L, "bullish", "CHoCH"),
         new SignalSetupRules.GapSnapshot("bullish", 101.4, 100.9),
         null,
         true,
@@ -48,7 +48,7 @@ class SignalSetupRulesTest {
         true,
         false,
         "New York AM",
-        new SignalSetupRules.ShiftSnapshot("bullish", "BOS"),
+        new SignalSetupRules.ShiftSnapshot(1_715_400_000_000L, "bullish", "BOS"),
         new SignalSetupRules.GapSnapshot("bullish", 101.4, 100.9),
         null,
         true,
@@ -73,8 +73,11 @@ class SignalSetupRulesTest {
         false,
         true,
         "London",
-        new SignalSetupRules.ShiftSnapshot("bearish", "CHoCH"),
-        new SignalSetupRules.SweepSnapshot("up", 100.0)
+        new SignalSetupRules.ShiftSnapshot(1_715_500_000_000L, "bearish", "CHoCH"),
+        new SignalSetupRules.SweepSnapshot(1_715_499_940_000L, "up", 100.0),
+        0,
+        1,
+        true
       )
     );
 
@@ -100,7 +103,34 @@ class SignalSetupRulesTest {
         true,
         "London",
         null,
-        new SignalSetupRules.SweepSnapshot("up", 100.0)
+        new SignalSetupRules.SweepSnapshot(1_715_499_940_000L, "up", 100.0),
+        Integer.MAX_VALUE,
+        1,
+        false
+      )
+    );
+
+    assertThat(signal).isNull();
+  }
+
+  @Test
+  void rejectsSweepShiftSignalWhenSweepContextIsStale() {
+    SignalSetupRules.SignalSpec signal = SignalSetupRules.buildSweepShiftSignal(
+      new SignalSetupRules.SweepShiftInput(
+        candle(1_715_500_000_000L, 99.0),
+        true,
+        true,
+        "Bearish",
+        false,
+        true,
+        false,
+        true,
+        "London",
+        new SignalSetupRules.ShiftSnapshot(1_715_499_940_000L, "bearish", "CHoCH"),
+        new SignalSetupRules.SweepSnapshot(1_715_499_700_000L, "up", 100.0),
+        1,
+        5,
+        true
       )
     );
 
@@ -129,7 +159,7 @@ class SignalSetupRulesTest {
         false,
         true,
         false,
-        new SignalSetupRules.SweepSnapshot("down", 100.9),
+        new SignalSetupRules.SweepSnapshot(1_715_599_940_000L, "down", 100.9),
         new SignalSetupRules.GapSnapshot("bullish", 101.8, 101.2)
       )
     );
@@ -154,7 +184,7 @@ class SignalSetupRulesTest {
         false,
         true,
         false,
-        new SignalSetupRules.SweepSnapshot("down", 100.9),
+        new SignalSetupRules.SweepSnapshot(1_715_599_940_000L, "down", 100.9),
         new SignalSetupRules.GapSnapshot("bullish", 101.8, 101.2)
       )
     );
